@@ -18,10 +18,7 @@ function kd(ev)
     {
         s += k;
         if (s.length === 6)
-        {
-            document.getElementById("input").remove();
             unityInstance = f(...a);
-        }
         lk = k;
     }
     else
