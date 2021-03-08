@@ -8,16 +8,15 @@
     <link rel="stylesheet" href="TemplateData/style.css">
     <script src="TemplateData/UnityProgress.js"></script>
     <script src="Build/UnityLoader.js"></script>
-    <script>
-      var unityInstance = UnityLoader.instantiate("unityContainer", "Build/Build.json", {onProgress: UnityProgress});
-    </script>
+    <script src="verify.js"></script>
   </head>
   <body>
+    <input id="input">
     <div class="webgl-content">
       <div id="unityContainer" style="width: 960px; height: 600px"></div>
       <div class="footer">
         <div class="webgl-logo"></div>
-        <div class="fullscreen" onclick="unityInstance.SetFullscreen(1)"></div>
+        <div class="fullscreen" onclick="if (unityInstance) unityInstance.SetFullscreen(1)"></div>
         <div class="title">TOS Vortex Soundboard</div>
       </div>
     </div>
