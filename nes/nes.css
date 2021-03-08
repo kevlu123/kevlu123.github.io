@@ -1,0 +1,11 @@
+body {
+    background-color: #E4855E;
+}
+
+img {
+    width: 30%;
+}
+
+h1, p, ul {
+    font-family: 'Roboto', sans-serif;
+}
