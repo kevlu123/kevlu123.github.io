@@ -153,6 +153,8 @@ class LandMineTile extends Tile
         {
             this._willExplode = true;
 
+            AudioPlayer.play(LANDMINE_SOUND_FILENAME);
+
             // Change image view
             this.setImageView(ImageView.fromAtlas(
                 TILE_ATLAS_FILENAME,

@@ -130,6 +130,11 @@ class SpriteList
     {
         return this._sprites.every(predicate);
     }
+
+    map(selector)
+    {
+        return this._sprites.map(selector);
+    }
     
     concat(spriteList)
     {
@@ -160,7 +165,7 @@ class TileSpriteList
 
             resizeArray(this._sprites, y + 1, []);
             resizeArray(this._sprites[y], x, null);
-            this._sprites[y][x] = sprite;
+            this._sprites[y][x] = sprite; 
 
             sprite._spriteLists.push(this);
         }
@@ -174,33 +179,6 @@ class TileSpriteList
             return this._sprites[y][x];
         else
             return null;
-    }
-    
-    // Calls f for each sprite in the list. Supports destroy() while iterating.
-    forEach(f)
-    {
-        for (let y = 0; y < this._sprites.length; y++)
-            for (let x = 0; x < this._sprites[y].length; x++)
-            {
-                let sprite = this.get(x, y);
-                if (sprite !== null)
-                {
-                    f(sprite);
-                    
-                    if (sprite.isDestroyed())
-                    {
-                        x--;
-                        if (x <= 0)
-                        {
-                            y--;
-                            if (y <= 0)
-                                break;
-
-                            x = -1;
-                        }
-                    }
-                }
-            }
     }
 }
 

@@ -35,6 +35,14 @@ class Graphics
             targetY /= this.targets.length;
         }
 
+        // Zoom out if targets are too far apart
+        let minTargetX = Math.min(...this.targets.map(t => t.x));
+        let maxTargetX = Math.max(...this.targets.map(t => t.x));
+        let xPixelSize = this.width() / (maxTargetX - minTargetX + ZOOM_BORDER);
+        let minTargetY = Math.min(...this.targets.map(t => t.y));
+        let maxTargetY = Math.max(...this.targets.map(t => t.y));
+        let yPixelSize = this.height() / (maxTargetY - minTargetY + ZOOM_BORDER);
+        PIXEL_SIZE = Math.min(MAX_PIXEL_SIZE, xPixelSize, yPixelSize);
 
         // Interpolate camera towards target
         this.x = lerp(this.x, targetX, CAMERA_LERP);

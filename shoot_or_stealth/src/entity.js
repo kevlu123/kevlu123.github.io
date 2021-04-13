@@ -7,6 +7,7 @@ class Entity extends PhysicsSprite
         this.x = x;
         this.y = y;
         this.useGravity = true;
+        this.dampingX = ENTITY_DAMPING;
         this.addCollidableSpriteList(levelTiles);
         this.addCollidableSpriteList(entities);
         this.setImageView(ImageView.fromAtlas(
@@ -21,6 +22,12 @@ class BoxBlock extends Entity
     constructor(x, y)
     {
         super(x, y, ObjectAtlasIndex.BOX);
+    }
+
+    onShot(bulletType, collision)
+    {
+        this.velX = BOX_SHOT_VEL * collision.relVelX;
+        this.velY = BOX_SHOT_VEL * collision.relVelY;
     }
 }
 

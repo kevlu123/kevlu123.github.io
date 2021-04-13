@@ -1,5 +1,24 @@
 
-// Files
+// Misc settings
+const BACKGROUND_COLOUR = [0x87, 0xCE, 0xFF];
+const MAX_PIXEL_SIZE = 2;
+let PIXEL_SIZE = MAX_PIXEL_SIZE; // Can change
+const TILE_SIZE = 16;
+const GRAVITY_STRENGTH = -0.4;
+const COYOTE_JUMP_TIME = 0.05;
+const CAMERA_LERP = 0.06;
+const ZOOM_BORDER = 8 * TILE_SIZE;
+const FRAME_DURATION = 1 / 60;
+const CRATE_SPAWN_RATE = 0.002;
+const TILE_HP = 5;
+const DENSE_WALL_HP = 26;
+const PLAYER2_ATLAS_INDEX_OFFSET = 3;
+const ENTITY_DAMPING = 0.9;
+const PLAYER_START_X = 240;
+const PLAYER_START_Y = 48;
+const TITLE_FADE_DISTANCE = 5 * TILE_SIZE;
+
+// Image files
 const CHARACTER_ATLAS_FILENAME = "img/characters.png";
 const TILE_ATLAS_FILENAME = "img/tiles.png";
 const OBJECT_ATLAS_FILENAME = "img/objects.png";
@@ -12,6 +31,12 @@ const WINSCREEN_FILENAME = "img/winscreen.png";
 const HEALTHBAR_FILENAME = "img/healthbar.png";
 const SOLIDCOLOURS_ATLAS_FILENAME = "img/solidcolours.png";
 
+// Audio files
+const EXPLOSION_SOUND_FILENAME = "audio/explosion.wav";
+const SHOOT_SOUND_FILENAME = "audio/shoot.wav";
+const LANDMINE_SOUND_FILENAME = "audio/landmine.wav";
+const MUSIC_FILENAME = "audio/music.wav";
+
 // Bullet properties (where applicable)
 const BULLET_ANGULAR_VELOCITY = -0.3;
 const BULLET_ANGULAR_DAMPING = 0.98;
@@ -19,6 +44,7 @@ const BULLET_COLLISION_DAMPING = 0.95;
 const BULLET_ROTATION_COLLISION_DAMPING = 0.95;
 const BULLET_SPAWN_OFFSET_Y = 6;
 const BULLET_SPAWN_DISTANCE_THRESHOLD = 32;
+const BOX_SHOT_VEL = 0.1;
 
 // Explosions
 const EXPLOSION_DAMAGE = 25;
@@ -59,6 +85,8 @@ const ENEMY_SHOOT_DURATION_MIN = 0.3;
 const ENEMY_SHOOT_DURATION_MAX = 0.7;
 const ENEMY_RAYCAST_DIR_X = Math.cos(Math.PI / 3);
 const ENEMY_RAYCAST_DIR_Y = Math.sin(Math.PI / 3);
+const ENEMY_AI_RADIUS = 10 * TILE_SIZE;
+const ENEMY_VISION = 8 * TILE_SIZE;
 
 // Particles
 const BLOOD_PARTICLE_COUNT = 5;
@@ -67,7 +95,7 @@ const BLOOD_PARTICLE_MIN_SIZE = 1;
 const BLOOD_PARTICLE_MAX_SIZE_EXCL = 5;
 const BLOOD_PARTICLE_LIFETIME = 2;
 
-const EXPLOSION_PARTICLE_COUNT = 50;
+const EXPLOSION_PARTICLE_COUNT = 25;
 const EXPLOSION_PARTICLE_MAX_VEL = 10;
 const EXPLOSION_PARTICLE_LIFETIME = 2;
 const EXPLOSION_PARTICLE_SIZE = 5;
@@ -79,18 +107,6 @@ const TILE_PARTICLE_MIN_SIZE = 2;
 const TILE_PARTICLE_MAX_SIZE_EXCL = 5;
 const TILE_PARTICLE_LIFETIME = 2;
 
-// Other settings
-const BACKGROUND_COLOUR = [0x87, 0xCE, 0xFF];
-const PIXEL_SIZE = 2;
-const TILE_SIZE = 16;
-const GRAVITY_STRENGTH = -0.4;
-const COYOTE_JUMP_TIME = 0.05;
-const CAMERA_LERP = 0.06;
-const FRAME_DURATION = 1 / 60;
-const CRATE_SPAWN_RATE = 0.002;
-const TILE_HP = 5;
-const DENSE_WALL_HP = 26;
-const PLAYER2_ATLAS_INDEX_OFFSET = 3;
 
 // Key bindings
 class Key
@@ -107,9 +123,9 @@ class Key
     static P2_RIGHT = "ArrowRight";
     static P2_UP = "ArrowUp";
     static P2_DOWN = "ArrowDown";
-    static P2_SHOOT = "Period";
-    static P2_JUMP = "Slash";
-    static P2_GRENADE = "ShiftRight";
+    static P2_SHOOT = "Comma";
+    static P2_JUMP = "Period";
+    static P2_GRENADE = "Slash";
 }
 
 // Indices into sprite atlases

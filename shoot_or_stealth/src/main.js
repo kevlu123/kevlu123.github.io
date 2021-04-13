@@ -202,6 +202,7 @@ function loadLevel(index)
 
     // Destroy sprites from previous level
     levelTiles = new TileSpriteList();
+    updatableTiles .forEach(sprite => sprite.destroy());
     enemies        .forEach(sprite => sprite.destroy());
     bullets        .forEach(sprite => sprite.destroy());
     entities       .forEach(sprite => sprite.destroy());
@@ -303,8 +304,22 @@ function drawUI()
         }
     }
 
-    gfx.drawUISprite(titleScreen);
-    gfx.drawUISprite(watermark);
+    if (levelIndex === 0)
+    {
+        let p1 = players.get(0);
+        let dist = distance(
+            PLAYER_START_X,
+            PLAYER_START_Y,
+            p1.x,
+            p1.y
+        );
+        let alpha = clamp(1 - dist / TITLE_FADE_DISTANCE, 0, 1);
+        titleScreen.alpha = alpha;
+        watermark.alpha = alpha;
+        gfx.drawUISprite(titleScreen);
+        gfx.drawUISprite(watermark);
+    }
+
     gfx.drawUISprite(gameoverScreen);
     gfx.drawUISprite(nextLevelScreen);
     gfx.drawUISprite(stealthedScreen);
@@ -325,37 +340,41 @@ function addPlayer2()
 
 function controlPlayer()
 {
+    let p1 = players.get(0);
+
     if (input.getKey(Key.LEFT))
-        players.get(0).moveLeft();
+        p1.moveLeft();
     if (input.getKey(Key.RIGHT))
-        players.get(0).moveRight();
+        p1.moveRight();
     if (input.getKey(Key.DOWN))
-        players.get(0).moveDown();
+        p1.moveDown();
     if (input.getKey(Key.UP))
-        players.get(0).moveUp();
-    if (input.getKeyDown(Key.JUMP))
-        players.get(0).jump();
+        p1.moveUp();
+    if (input.getKeyDown(Key.JUMP) || input.getKeyDown(Key.UP) && !p1.checkCollisionWithSprites(ladders))
+        p1.jump();
     if (input.getKey(Key.SHOOT))
-        players.get(0).shoot();
+        p1.shoot();
     if (input.getKeyDown(Key.GRENADE))
-        players.get(0).throwGrenade();
+        p1.throwGrenade();
 
     if (players.length === 2)
     {
+        let p2 = players.get(1);
+
         if (input.getKey(Key.P2_LEFT))
-            players.get(1).moveLeft();
+            p2.moveLeft();
         if (input.getKey(Key.P2_RIGHT))
-            players.get(1).moveRight();
+            p2.moveRight();
         if (input.getKey(Key.P2_DOWN))
-            players.get(1).moveDown();
+            p2.moveDown();
         if (input.getKey(Key.P2_UP))
-            players.get(1).moveUp();
-        if (input.getKeyDown(Key.P2_JUMP))
-            players.get(1).jump();
+            p2.moveUp();
+        if (input.getKeyDown(Key.P2_JUMP) || input.getKeyDown(Key.P2_UP) && !p2.checkCollisionWithSprites(ladders))
+            p2.jump();
         if (input.getKey(Key.P2_SHOOT))
-            players.get(1).shoot();
+            p2.shoot();
         if (input.getKeyDown(Key.P2_GRENADE))
-            players.get(1).throwGrenade();
+            p2.throwGrenade();
     }
 
     if (players.length === 1 && input.getKeyDown(Key.P2_SHOOT))
@@ -377,6 +396,9 @@ function updateMenu()
     if (startGame)
     {
         gameState = GameState.GAMEPLAY;
+        
+        // Start background music
+        Timer.addTimer(0.5, () => AudioPlayer.playLooped(MUSIC_FILENAME));
 
         Animator.interpolate(
             titleScreen,
@@ -551,6 +573,8 @@ function createExplosion(x, y)
 
     // Check entities
     entities.forEach(checkExplosion);
+
+    AudioPlayer.play(EXPLOSION_SOUND_FILENAME);
 }
 
 // Win event

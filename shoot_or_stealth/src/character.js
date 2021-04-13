@@ -218,6 +218,8 @@ class Character extends PhysicsSprite
 
         bullet.addCollidableSpriteList(entities);
         bullets.push(bullet);
+
+        AudioPlayer.play(SHOOT_SOUND_FILENAME);
         return true;
     }
 
@@ -271,6 +273,11 @@ class Character extends PhysicsSprite
 
         this._hitbox.y = 1;
     }
+
+    isTouchingLadder()
+    {
+        return this._touchingLadder;
+    }
 }
 
 // Base sprite class for enemies
@@ -289,7 +296,14 @@ class Enemy extends Character
     update()
     {
         // If enemy has seen the player, walk and shoot
-        if (this._triggered && !this.isDead())
+        let isNearPlayer = false;
+        for (let player of players)
+            if (distanceSqr(this.x, this.y, player.x, player.y) < ENEMY_AI_RADIUS ** 2)
+            {
+                isNearPlayer = true;
+                break;
+            }
+        if (this._triggered && !this.isDead() && isNearPlayer)
         {
             if (time >= this._walkTime)
             {
@@ -303,7 +317,7 @@ class Enemy extends Character
                     let hits = raycast(
                         this.x + TILE_SIZE / 2,
                         this.y + TILE_SIZE / 2,
-                        ENEMY_RAYCAST_DIR_X,
+                        this.flippedX ? -ENEMY_RAYCAST_DIR_X : ENEMY_RAYCAST_DIR_X,
                         ENEMY_RAYCAST_DIR_Y,
                         [levelTiles],
                         TILE_SIZE,
@@ -337,14 +351,14 @@ class Enemy extends Character
 
             let hits = new SpriteList();
             for (let player of players)
-                if (distanceSqr(this.x, this.y, player.x, player.y) < this._bulletType.range ** 2)
+                if (distanceSqr(this.x, this.y, player.x, player.y) < ENEMY_VISION ** 2)
                     hits.push(...raycast(
                         this.x + TILE_SIZE / 2,
                         this.y + TILE_SIZE / 2,
                         this.flippedX ? -1 : 1,
                         0,
-                        [levelTiles, players],
-                        this._bulletType.range
+                        [levelTiles, players, entities],
+                        ENEMY_VISION
                     ));
 
             if (!this.isDead() && hits.some(hit => players.includes(hit)))
@@ -361,8 +375,6 @@ class Enemy extends Character
     damage(amount)
     {
         super.damage(amount);
-        if (!this.isDead())
-            this._trigger();
         if (this._hp <= OVERKILL_HP)
             this._overkill();
     }
