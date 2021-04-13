@@ -103,7 +103,7 @@ function loadUI()
         SolidColourAtlasIndex.FADE_SCREEN
     ));
     fadeOverlay.alpha = 0;
-    fadeOverlay.size = 2;
+    fadeOverlay.size = 10;
     
     // Health bar
     healthbar = new UISprite(new ImageView(
