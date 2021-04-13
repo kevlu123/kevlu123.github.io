@@ -241,7 +241,7 @@ const GRENADE_BULLET = {
     range: null,
     spread: 1,
     usePhysics: true,
-    bouncyness: 0.7,
+    bouncyness: 0.6,
     lifetime: 2.5,
     atlasIndex: ObjectAtlasIndex.GRENADE_BULLET,
     useCircularHitbox: false,
