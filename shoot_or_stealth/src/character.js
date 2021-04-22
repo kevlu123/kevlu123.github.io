@@ -455,7 +455,10 @@ class Player extends Character
     die()
     {
         if (!isLastLevel())
+        {
             super.die();
+            this.setGun(DEFAULT_BULLET);
+        }
     }
     
     getHealthPercentage()
