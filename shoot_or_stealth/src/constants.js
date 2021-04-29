@@ -85,7 +85,7 @@ const ENEMY_SHOOT_DURATION_MIN = 0.3;
 const ENEMY_SHOOT_DURATION_MAX = 0.7;
 const ENEMY_RAYCAST_DIR_X = Math.cos(Math.PI / 3);
 const ENEMY_RAYCAST_DIR_Y = Math.sin(Math.PI / 3);
-const ENEMY_AI_RADIUS = 10 * TILE_SIZE;
+const ENEMY_AI_RADIUS = 20 * TILE_SIZE;
 const ENEMY_VISION = 8 * TILE_SIZE;
 
 // Particles

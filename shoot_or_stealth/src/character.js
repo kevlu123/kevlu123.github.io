@@ -455,10 +455,7 @@ class Player extends Character
     die()
     {
         if (!isLastLevel())
-        {
             super.die();
-            this.setGun(DEFAULT_BULLET);
-        }
     }
     
     getHealthPercentage()
@@ -483,6 +480,8 @@ class Player extends Character
         this.angle = 0;
         this.dampingX = PLAYER_DAMPING_X;
         this._hitbox.y = 0;
+        this.setGun(DEFAULT_BULLET);
+        this.refillGrenades();
     }
 
     setGun(bulletType)
