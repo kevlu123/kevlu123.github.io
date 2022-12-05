@@ -1,0 +1,135 @@
+* {
+  margin: 0px;
+  padding: 0px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  color: #6b675a;
+}
+
+body {
+  background-color: #fffcd8;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+nav {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  padding: 5px;
+  font-weight: bold;
+  background-color: #6b675a;
+  color: #fffcd8;
+  opacity: 1;
+  z-index: 1;
+}
+
+.hover-link:hover {
+  text-decoration: underline;
+}
+
+header {
+  padding: 100px 0px 100px 0;
+  text-align: center;
+  background-color: #bdc36d;
+  color: #fffcd8;
+}
+
+footer {
+  padding: 20px;
+  text-align: center;
+  background-color: #bdc36d;
+  color: #fffcd8;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+footer > a {
+  font-weight: normal;
+}
+
+code, samp {
+  font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
+}
+
+.valign {
+  vertical-align: middle;
+}
+
+.flex-container {
+  padding: 20px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+}
+
+.github-link {
+  position: absolute;
+  right: 18px;
+  top: 12px;
+}
+
+.github-link:hover {
+  text-decoration: underline;
+}
+
+body {
+  background-color: #fffcd8;
+}
+
+header {
+  padding: 40px;
+}
+
+*[disabled] {
+  opacity: 0.6;
+}
+
+#in, #out, #restart {
+  display: block;
+  width: calc(100% - 40px);
+  font-family: "Courier New", Courier, monospace;
+  border-width: 0px;
+  background-color: #eaecc6;
+  resize: none;
+  border: none;
+  outline: none;
+}
+
+#out {
+  height: 55vh;
+  margin: 20px 20px 0px 20px;
+}
+
+#in {
+  height: 20px;
+  margin: 0px 20px 20px 20px;
+}
+
+#status {
+  margin: 20px 20px 0px 20px;
+  background-color: #eaecc6;
+  font-family: "Courier New", Courier, monospace;
+}
+
+#restart {
+  padding: 8px;
+  margin: 20px 20px 20px 20px;
+  border-radius: 2px;
+  outline: none;
+  border-style: solid;
+  border-width: 1px;
+  background-color: #eaecc6;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}

@@ -1,0 +1,93 @@
+$light: #fffcd8;
+//$mid: #d1d682;
+$mid: #bdc36d;
+$dark: #6b675a;
+$inset: #eaecc6;
+$font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+$mono: 'Courier New', Courier, monospace;
+
+* {
+    margin: 0px;
+    padding: 0px;
+    font-family: $font;
+}
+
+html {
+    scroll-behavior: smooth;
+    color: $dark;
+}
+
+body {
+    background-color: $light;
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+nav {
+    position: sticky;
+    top: 0;
+    padding: 5px;
+    font-weight: bold;
+    background-color: $dark;
+    color: $light;
+    opacity: 1;
+    z-index: 1;
+}
+
+.hover-link:hover {
+    text-decoration: underline;
+}
+
+header {
+    padding: 100px 0px 100px 0;
+    text-align: center;
+    background-color: $mid;
+    color: $light;
+}
+
+footer {
+    padding: 20px;
+    text-align: center;
+    background-color: $mid;
+    color: $light;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+footer > a {
+    font-weight: normal;
+}
+
+code, samp {
+    font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
+}
+
+.valign {
+    vertical-align: middle;
+}
+
+.flex-container {
+    padding: 20px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+}
+
+.github-link {
+    // Hack!
+    position: absolute;
+    right: 18px;
+    top: 12px;
+}
+
+.github-link:hover {
+    text-decoration: underline;
+}

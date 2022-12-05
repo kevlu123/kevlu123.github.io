@@ -1,0 +1,17 @@
+@import "../global/style";
+
+h2, p {
+    margin: 15px;
+}
+
+.content {
+    padding: 15px 30px 15px 30px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.license {
+    padding: 15px;
+    background-color: $inset;
+    border-radius: 10px;
+}

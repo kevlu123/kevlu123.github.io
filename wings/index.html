@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <title>Wings</title>
+  <link rel="icon" type="image/x-icon" href="/global/icon.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div>
+    <!-- Header-->
+    <nav>
+      <a class="hover-link" href="/index.html">
+        <img class="valign" src="/global/logo.png" height="40">
+        ~
+      </a>
+      /
+      <a class="hover-link" href="#top">wings</a>
+
+      <a class="github-link" href="https://github.com/kevlu123">
+        GitHub
+      </a>
+    </nav>
+
+    <header id="top">
+      <h1>Wings</h1>
+      An embeddable header-only Python interpreter for C/C++.
+
+      <p>
+        <a class="hover-link" href="https://github.com/kevlu123/wings">
+          GitHub
+        </a>
+        |
+        <a class="hover-link" href="docs/index.html">
+          Documentation
+        </a>
+        |
+        <a class="hover-link" href="repl/index.html">
+          Online REPL
+        </a>
+      </p>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+      <h2>Wings</h2>
+      <p>
+        There are many situations where you may want
+        to add scripting into your program.
+      </p>
+      <p>
+        The usual options are to embed a Lua/Python
+        interpreter, or to create your own custom
+        scripting language. However, Python is not
+        always easy to set up, and custom scripting
+        is a huge task. Lua would be perfect except
+        that indices start at 0.
+      </p>
+      <p>
+        Wings focuses primarily on being easy to set up.
+        It does not focus on performance, low memory usage,
+        <b>nor security. Do not execute untrusted scripts!</b>
+        Wings is perfect for configuration files, and light modding.
+      </p>
+
+      <h2>Compiling</h2>
+      <h3>Prerequisites</h3>
+      <ul>
+        <li>A compiler with C++20 support.</li>
+        <li>
+          If you're building the standalone
+          interpreter, you'll need CMake
+          and preferably Git.
+        </li>
+      </ul>
+
+      <h3>Embedding</h3>
+      <p>
+        Use <code>git clone</code> or manually download
+        <a class="hover-link" href="https://raw.githubusercontent.com/kevlu123/wings/main/single_include/wings.h">
+          wings.h
+        </a>
+        and add it to your project.
+      </p>
+      <p>
+        In exactly one .cpp file, enable the implementation
+        by writing <code>#define WINGS_IMPL</code>
+        before <code>#include "wings.h"</code>. Preferably,
+        this is done in a file that doesn't change often.
+      </p>
+      <p>
+        That's it! The entire API is contained within
+        <span class="mono">wings.h</span>
+        so you can just include that wherever you need it.
+      </p>
+
+      <h3>Standalone Interpreter</h3>
+      <p>
+        Run the following commands in a terminal.
+        The executable will be located at
+        <code>./out/bin/wings</code>.
+      </p>
+
+<pre><code>git clone https://github.com/kevlu123/wings
+cd wings
+cmake -S. -Bout -DCMAKE_BUILD_TYPE=Release
+cmake --build out
+</code></pre>
+
+      <h2>Quick Start</h2>
+      <p>
+        The following example prints
+        "Hello, World!" from Python.
+      </p>
+
+<pre><code>#include &lt;stdio.h&gt;
+
+// Define this macro in one C++ source file
+// before including wings.h
+#define WINGS_IMPL
+#include "wings.h"
+
+int main() {
+    // Create a context with the default configuration.
+    // The context contains the state of the interpreter.
+    Wg_Context* ctx = Wg_CreateContext(NULL);
+    if (ctx == NULL) {
+        printf("Failed to create context.\n");
+        goto cleanup;
+    }
+
+    // Run some Python code.
+    if (!Wg_Execute(ctx, "print('Hello, World!')", NULL)) {
+        printf("Error: %s\n", Wg_GetErrorMessage(ctx));
+        goto cleanup;
+    }
+
+cleanup:
+    if (ctx) Wg_DestroyContext(ctx);
+    return 0;
+}</code></pre>
+
+      Output
+      <pre><samp>Hello, World!</samp></pre>
+
+      <h2>Manipulating Python Values From C/C++</h2>
+      <p>
+        Since Python is garbage collected,
+        care must be taken to ensure that
+        the interpreter does not free an
+        object that is still being used by C/C++.
+        This is done by managing a reference
+        count on the object.
+      </p>
+      <p>
+        The following example retrieves two values
+        from Python, adds them together from C/C++, and prints
+        out the result.
+      </p>
+
+<pre><code>// Set some variables in Python.
+// Note: Unlike in Python, tuples must be written in brackets.
+if (!Wg_Execute(ctx, "(x, y) = (3, 4)", NULL)) {
+    // Handle error
+}
+
+// Get the global variables
+Wg_Obj* x = Wg_GetGlobal(ctx, "x");
+Wg_Obj* y = Wg_GetGlobal(ctx, "y");
+if (x == NULL || y == NULL) {
+    // Handle error
+}
+
+// Increase reference counts to prevent the values
+// from being garbage collected.
+Wg_IncRef(x);
+Wg_IncRef(y);
+
+// Add the values together
+Wg_Obj* z = Wg_BinaryOp(WG_BOP_ADD, x, y);
+if (z == NULL) {
+    // Handle error
+}
+
+// Decrease reference counts to allow the values
+// to be garbage collected again.
+// The Wg_XXX functions called later in this example
+// will not trigger the garbage collector because
+// they do not create any new Python objects, so we can
+// safely decrease the reference counts now.
+Wg_DecRef(x);
+Wg_DecRef(y);
+
+// Get the integer from the Python objects.
+// Wg_int is a typedef for int64_t.
+if (!Wg_IsInt(x) || !Wg_IsInt(y) || !Wg_IsInt(z)) {
+    // Handle unexpected type
+}
+Wg_int xv = Wg_GetInt(x);
+Wg_int yv = Wg_GetInt(y);
+Wg_int zv = Wg_GetInt(z);
+
+// Print the result
+printf("%lld + %lld = %lld\n", xv, yv, zv);
+</code></pre>
+
+      Output
+      <pre><samp>3 + 4 = 7</samp></pre>
+
+      <h2>Error Handling</h2>
+      <p>
+      Many operations in Wings can fail. Even a simple addition
+      may call an overloaded operator, which may throw an exception.
+      </p>
+      <p>
+        In Wings, all errors are reported by Python exceptions and
+        the exception or error message can be retrieved via
+        <code>Wg_GetException()</code> and <code>Wg_GetErrorMessage()</code>
+        respectively.
+      </p>
+      <p>
+        There is one exception to this rule;
+        <code>Wg_CreateContext()</code>
+        may fail but there is no way to retrieve the error message.
+        since the error reporting functions require a context. Fortunately,
+        <code>Wg_CreateContext()</code>
+        only fails if the interpreter is unable to allocate enough
+        Python objects, so the error message is implied.
+      </p>
+      <p>
+        When an exception occurs, you should either handle it
+        or propagate it to the caller. To handle the exception, call
+        <code>Wg_ClearException()</code>.
+      </p>
+      
+<pre><code>if (Wg_ExecuteExpression(ctx, "1 / 0", NULL) == NULL) {
+    // Handle error
+    printf("%s", Wg_GetErrorMessage(ctx));
+    Wg_ClearException(ctx);
+}</code></pre>
+
+      Output
+<pre><samp>Traceback (most recent call last):
+  Module __main__, Line 1, Function &lt;string&gt;()
+    1 / 0
+  Module __builtins__, Function __truediv__()
+ZeroDivisionError</samp></pre>
+
+      <h2>Calling C/C++ from Python</h2>
+      <p>
+        Calling a C/C++ function from Python is as
+        simple as calling <code>Wg_NewFunction</code>
+        to create a function object, and assigning
+        the result to a Python variable.
+      </p>
+
+<pre><code>Wg_Obj* ImportByString(Wg_Context* ctx, Wg_Obj** argv, int argc) {
+    // Raise an exception if arguments are invalid.
+    // Note that arguments are exempt from garbage collection
+    // for the duration of this function.
+    if (argc != 1 || Wg_IsString(argv[0])) {
+        Wg_RaiseException(ctx, WG_EXC_TYPEERROR, "Expected a string");
+        return NULL; // Return NULL to indicate an error
+    }
+    
+    const char* moduleName = Wg_GetString(argv[0]);
+    if (Wg_ImportModule(ctx, moduleName, NULL) == NULL) {
+        // An exception is already set by Wg_ImportModule
+        // so we can just return NULL.
+        return NULL;
+    }
+
+    // This is the return value of the function.
+    return Wg_None(ctx);
+}
+
+void BindAndRunNativeFunction(Wg_Context* ctx) {
+    // Create a function object
+    Wg_Obj* importByString = Wg_NewFunction(ctx, ImportByString, NULL, NULL);
+    if (importByString == NULL) {
+        // Handle error
+    }
+
+    // Bind the function to a Python variable
+    Wg_SetGlobal(ctx, "import_by_string", importByString);
+
+    // Call the function from Python
+    const char* code =
+        "import_by_string('math')\n"
+        "print(math.pi)";
+    if (!Wg_Execute(ctx, code, NULL)) {
+        // Handle error
+    }
+}</code></pre>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    © 2022 Kevin's Projects |
+    <a class="hover-link" href="/about/index.html">
+      About
+    </a>
+  </footer>
+</body>
+
+</html>

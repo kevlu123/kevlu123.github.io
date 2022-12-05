@@ -1,0 +1,101 @@
+* {
+  margin: 0px;
+  padding: 0px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  color: #6b675a;
+}
+
+body {
+  background-color: #fffcd8;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+nav {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  padding: 5px;
+  font-weight: bold;
+  background-color: #6b675a;
+  color: #fffcd8;
+  opacity: 1;
+  z-index: 1;
+}
+
+.hover-link:hover {
+  text-decoration: underline;
+}
+
+header {
+  padding: 100px 0px 100px 0;
+  text-align: center;
+  background-color: #bdc36d;
+  color: #fffcd8;
+}
+
+footer {
+  padding: 20px;
+  text-align: center;
+  background-color: #bdc36d;
+  color: #fffcd8;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+footer > a {
+  font-weight: normal;
+}
+
+code, samp {
+  font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
+}
+
+.valign {
+  vertical-align: middle;
+}
+
+.flex-container {
+  padding: 20px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+}
+
+.github-link {
+  position: absolute;
+  right: 18px;
+  top: 12px;
+}
+
+.github-link:hover {
+  text-decoration: underline;
+}
+
+h2, p {
+  margin: 15px;
+}
+
+.content {
+  padding: 15px 30px 15px 30px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.license {
+  padding: 15px;
+  background-color: #eaecc6;
+  border-radius: 10px;
+}
