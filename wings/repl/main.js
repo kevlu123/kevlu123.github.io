@@ -16,7 +16,7 @@ function initialize() {
     ps = ">";
     
     out.value = "";
-    inp.value = ">>> ";
+    inp.value = "";
     
     out.disabled = true;
     inp.disabled = true;
@@ -60,33 +60,24 @@ function outputOnClick(event) {
 }
 
 function inputOnInput(event) {
-    while (!inp.value.startsWith(ps.repeat(3))) {
-        inp.value = ps + inp.value;
-    }
-    if (!inp.value.startsWith(ps.repeat(3) + " ")) {
-        inp.value = ps.repeat(3) + " " + inp.value.substring(3);
-    }
-
-    let text = inp.value;
-    if (!text.includes("\n"))
-        return;
-
-    write(text);
-    code += text.substring(4);
-    if (text.trim().endsWith(":")) {
-        inp.value = "... ";
-        ps = ".";
-    } else {
-        console.log(code);
-        execute(code);
-        code = "";
-        inp.value = ">>> ";
-        ps = ">";
-    }
 }
 
 function inputOnKeyDown(event) {
-    
+    if (event.key !== "Enter")
+        return;
+
+    let text = inp.value + "\n";
+    write(ps.repeat(3) + " " + text);
+    code += text
+    if (text.trim().endsWith(":")) {
+        ps = ".";
+        inp.value = "";
+    } else {
+        execute(code);
+        code = "";
+        inp.value = "";
+        ps = ">";
+    }
 }
 
 function restartOnClick(event) {
