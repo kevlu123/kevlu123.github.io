@@ -10,16 +10,25 @@ function post(type, message="") {
 }
 
 Module.onRuntimeInitialized = () => {
-	post("status", "Initializing...\n");
+	post("status", "Initializing...");
 	if (_OpenRepl() !== 0) {
-		post("status", "Failed to initialize\n");
+		post("status", "Failed to initialize");
 		post("initialize", "fail");
 	} else {
 		initialized = true;
-		post("status", "Running\n");
+		post("status", "Running");
 		post("initialize", "success");
 	}
 };
+
+function onprint() {
+	let output = UTF8ToString(_GetStdout());
+	post("stdout", output);
+}
+
+function clearConsole() {
+	post("clear");
+}
 
 onmessage = (event) => {
 	if (!initialized) {
@@ -30,8 +39,11 @@ onmessage = (event) => {
 	let ptr = allocateUTF8(code);
 	_Execute(ptr);
 	_free(ptr);
-	
-	let output = UTF8ToString(_GetStdout());
-	post("stdout", output);
-	_ClearStdout();
+
+	if (_ShouldExit()) {
+		_CloseRepl();
+		initialized = false;
+		post("status", "Exited");
+		post("initialize", "exit");
+	}
 };

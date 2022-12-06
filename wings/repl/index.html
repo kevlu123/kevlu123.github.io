@@ -33,10 +33,15 @@
     </header>
 
     <!-- Content -->
-    <p id="status"></p>
-    <textarea id="out" readonly="true"></textarea>
-    <textarea id="in"></textarea>
-    <button id="restart">Restart Instance</button>
+    <div class="content">
+      <p id="status">Status: Initializing...</p>
+      <textarea id="out" readonly="true"></textarea>
+      <div class="full-width">
+        <input id="prompt" readonly="true"></input>
+        <input id="in"></input>
+      </div>
+      <button id="restart">Restart Instance</button>
+    </div>
 
   </div>
 

@@ -9,9 +9,19 @@
 #include <stack>
 #include <string.h>
 
+#include <emscripten.h>
+
 static Wg_Context* ctx;
 static Wg_Context* exprChecker;
 static std::string mystdout;
+static bool shouldExit;
+static Wg_Obj* sysexit;
+
+
+static Wg_Obj* Clear(Wg_Context* ctx, Wg_Obj**, int) {
+	emscripten_run_script("clearConsole();");
+	return Wg_None(ctx);
+}
 
 extern "C" {
 	int OpenRepl() {
@@ -19,7 +29,8 @@ extern "C" {
 		Wg_DefaultConfig(&cfg);
 		cfg.enableOSAccess = true;
 		cfg.print = [](const char* msg, int len, void*) {
-			mystdout += std::string_view(msg, len);
+			mystdout = std::string_view(msg, len);
+			emscripten_run_script("onprint();");
 		};
 		
 		ctx = Wg_CreateContext(&cfg);
@@ -27,15 +38,24 @@ extern "C" {
 			return 1;
 		}
 
+		sysexit = Wg_GetGlobal(ctx, "SystemExit");
+		Wg_IncRef(sysexit);
+
+		Wg_Obj* clear = Wg_NewFunction(ctx, Clear, nullptr, "clear");
+		if (clear == nullptr) {
+			Wg_DestroyContext(ctx);
+			return 1;
+		}
+		Wg_SetGlobal(ctx, "clear", clear);
+
 		// This context is only used to check if strings
 		// are expressions rather than a set of statements.
 		exprChecker = Wg_CreateContext();
 		if (exprChecker == nullptr) {
 			Wg_DestroyContext(ctx);
 			ctx = nullptr;
-			return 2;
+			return 1;
 		}
-
 		return 0;
 	}
 
@@ -46,12 +66,12 @@ extern "C" {
 		exprChecker = nullptr;
 	}
 
-	const char* GetStdout() {
-		return mystdout.c_str();
+	bool ShouldExit() {
+		return shouldExit;
 	}
 
-	void ClearStdout() {
-		mystdout.clear();
+	const char* GetStdout() {
+		return mystdout.c_str();
 	}
 
 	void Execute(const char* code) {
@@ -64,100 +84,27 @@ extern "C" {
 			result = Wg_None(ctx);
 		}
 
-		if (Wg_GetException(ctx)) {
-			mystdout += Wg_GetErrorMessage(ctx);
+		shouldExit = false;
+		if (Wg_Obj* exc = Wg_GetException(ctx)) {
+			if (Wg_IsInstance(exc, &sysexit, 1)) {
+				shouldExit = true;
+			} else {
+				Wg_PrintString(ctx, Wg_GetErrorMessage(ctx));
+			}
 			Wg_ClearException(ctx);
 			return;
 		}
 
 		if (!Wg_IsNone(result)) {
+			std::string text;
 			if (Wg_Obj* repr = Wg_UnaryOp(WG_UOP_REPR, result)) {
-				mystdout += Wg_GetString(repr);
-				mystdout += '\n';
+				text = Wg_GetString(repr);
+				text.push_back('\n');
 			} else {
-				mystdout += Wg_GetErrorMessage(ctx);
+				text = Wg_GetErrorMessage(ctx);
 			}
+			Wg_PrintString(ctx, text.c_str());
 		}
 		Wg_ClearException(ctx);
 	}
 }
-
-/*
-int RunRepl() {
-	Wg_Config cfg{};
-	Wg_DefaultConfig(&cfg);
-	cfg.enableOSAccess = true;
-	
-	Wg_Context* context = Wg_CreateContext(&cfg);
-	if (context == nullptr) {
-		return 1;
-	}
-
-	Wg_Obj* sysexit = Wg_GetGlobal(context, "SystemExit");
-	Wg_IncRef(sysexit);
-
-	// This context is only used to check if strings
-	// are expressions rather than a set of statements.
-	Wg_Context* exprChecker = Wg_CreateContext();
-	if (exprChecker == nullptr) {
-		Wg_DestroyContext(context);
-		return 2;
-	}
-
-	PrintVersion();
-	
-	std::string input;
-	bool indented = false;
-	while (true) {
-		if (input.empty()) {
-			std::cout << ">>> ";
-		} else {
-			std::cout << "... ";
-		}
-		
-		std::string line;
-		std::getline(std::cin, line);
-		input += line + "\n";
-
-		size_t lastCharIndex = line.find_last_not_of(" \t");
-		if (lastCharIndex != std::string::npos && line[lastCharIndex] == ':') {
-			indented = true;
-			continue;
-		}
-
-		if (indented && !line.empty()) {
-			continue;
-		}
-		
-		Wg_Obj* result = nullptr;
-		Wg_ClearException(exprChecker);
-		if (Wg_CompileExpression(exprChecker, input.c_str())) {
-			result = Wg_ExecuteExpression(context, input.c_str(), "<string>");
-		} else {
-			Wg_Execute(context, input.c_str(), "<string>");
-		}
-		input.clear();
-		indented = false;
-		
-		if (result && !Wg_IsNone(result)) {
-			if (Wg_Obj* repr = Wg_UnaryOp(WG_UOP_REPR, result)) {
-				std::cout << Wg_GetString(repr) << std::endl;
-			}
-		}
-		
-		Wg_Obj* exc = Wg_GetException(context);
-		if (exc) {
-			if (Wg_IsInstance(exc, &sysexit, 1)) {
-				break;
-			}
-			
-			std::cout << Wg_GetErrorMessage(context);
-			Wg_ClearException(context);
-		}
-	}
-
-	Wg_DestroyContext(exprChecker);
-	Wg_DestroyContext(context);
-	return 0;
-}
-*/

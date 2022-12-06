@@ -12,40 +12,66 @@ header {
     opacity: 0.6;
 }
 
-#in, #out, #restart {
-    display: block;
-    width: calc(100% - 40px);
+.content {
+    padding: 20px;
+}
+
+.full-width {
+    width: 100%;
+    height: 20px;
+    margin-bottom: 20px;
+}
+
+#status, #out, #prompt, #in, #restart {
     font-family: $mono;
     border-width: 0px;
     background-color: $inset;
     resize: none;
     border: none;
     outline: none;
+    tab-size: 4;
+}
+
+#status, #out, #restart {
+    width: 100%;
+    padding: 2px;
+    padding-left: 5px;
+}
+
+#status {
+    margin-bottom: 20px;
+    color: $dark;
 }
 
 #out {
     height: 55vh;
-    margin: 20px 20px 0px 20px;
+    color: $dark;
+    padding: 15px;
+}
+
+#prompt {
+    float: left;
+    width: 5ch;
+    height: 100%;
+    font-size: medium;
+    vertical-align: middle;
+    color: $dark;
+    text-align: center;
 }
 
 #in {
-    height: 20px;
-    margin: 0px 20px 20px 20px;
-}
-
-#status {
-    margin: 20px 20px 0px 20px;
-    background-color: $inset;
-    font-family: $mono;
+    float: left;
+    width: calc(100% - 5ch);
+    height: 100%;
+    font-size: medium;
+    color: black;
 }
 
 #restart {
     padding: 8px;
-    margin: 20px 20px 20px 20px;
-    border-radius: 2px;
-    outline: none;
     border-style: solid;
+    border-radius: 4px;
     border-width: 1px;
-    background-color: $inset;
     font-family: $font;
+    color: black;
 }
