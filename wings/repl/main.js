@@ -55,7 +55,7 @@ function workerOnMessage(event) {
             write(data.message);
             break;
         case "status":
-            stat.innerText = "Status: " + data.message;
+            stat.innerText = "Status: " + data.message + "\n";
             break;
         case "clear":
             out.value = "";

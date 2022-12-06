@@ -120,8 +120,6 @@ header {
 
 #status, #out, #restart {
   width: 100%;
-  padding: 2px;
-  padding-left: 5px;
 }
 
 #status {
@@ -132,7 +130,6 @@ header {
 #out {
   height: 55vh;
   color: #6b675a;
-  padding: 15px;
 }
 
 #prompt {
