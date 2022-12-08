@@ -57,7 +57,7 @@
         scripting language. However, Python is not
         always easy to set up, and custom scripting
         is a huge task. Lua would be perfect except
-        that indices start at 0.
+        that indices start at 1.
       </p>
       <p>
         Wings focuses primarily on being easy to set up.
@@ -79,7 +79,7 @@
 
       <h3>Embedding</h3>
       <p>
-        Use <code>git clone</code> or manually download
+        Use <code>git clone</code>, <code>git submodule add</code>, or manually download
         <a class="hover-link" href="https://raw.githubusercontent.com/kevlu123/wings/main/single_include/wings.h">
           wings.h
         </a>
@@ -95,6 +95,7 @@
         That's it! The entire API is contained within
         <span class="mono">wings.h</span>
         so you can just include that wherever you need it.
+        No other files are needed.
       </p>
 
       <h3>Standalone Interpreter</h3>
@@ -218,17 +219,17 @@ printf("%lld + %lld = %lld\n", xv, yv, zv);
       <p>
         In Wings, all errors are reported by Python exceptions and
         the exception or error message can be retrieved via
-        <code>Wg_GetException()</code> and <code>Wg_GetErrorMessage()</code>
+        <code>Wg_GetException()</code> or <code>Wg_GetErrorMessage()</code>
         respectively.
       </p>
       <p>
         There is one exception to this rule;
-        <code>Wg_CreateContext()</code>
-        may fail but there is no way to retrieve the error message.
-        since the error reporting functions require a context. Fortunately,
-        <code>Wg_CreateContext()</code>
-        only fails if the interpreter is unable to allocate enough
-        Python objects, so the error message is implied.
+        If <code>Wg_CreateContext()</code> fails, you cannot
+        get the error message since a valid context is required
+        to call the error reporting functions.
+        Luckily, the only way <code>Wg_CreateContext()</code>
+        can fail is if it fails to allocate enough Python objects
+        to initialize the interpreter.
       </p>
       <p>
         When an exception occurs, you should either handle it
@@ -249,12 +250,17 @@ printf("%lld + %lld = %lld\n", xv, yv, zv);
   Module __builtins__, Function __truediv__()
 ZeroDivisionError</samp></pre>
 
-      <h2>Calling C/C++ from Python</h2>
+      <h2>Calling Native Code from Python</h2>
       <p>
         Calling a C/C++ function from Python is as
         simple as calling <code>Wg_NewFunction</code>
         to create a function object, and assigning
         the result to a Python variable.
+      </p>
+      <p>
+        The following example embeds a C/C++ function
+        to allow Python to import modules by string.
+        This operation is not normally possible in vanilla Wings.
       </p>
 
 <pre><code>Wg_Obj* ImportByString(Wg_Context* ctx, Wg_Obj** argv, int argc) {
@@ -269,7 +275,7 @@ ZeroDivisionError</samp></pre>
     const char* moduleName = Wg_GetString(argv[0]);
     if (Wg_ImportModule(ctx, moduleName, NULL) == NULL) {
         // An exception is already set by Wg_ImportModule
-        // so we can just return NULL.
+        // so we can just return NULL to propagate the exception.
         return NULL;
     }
 
@@ -296,6 +302,105 @@ void BindAndRunNativeFunction(Wg_Context* ctx) {
     }
 }</code></pre>
 
+      Output
+      <pre><samp>3.141593</samp></pre>
+
+      <h2>Storing Native Data in Python</h2>
+      <p>
+        Wings allows you to store native data in Python objects.
+        This is useful for storing data that is not easily
+        represented in Python, such as pointers to C/C++ objects.
+      </p>
+      <p>
+        The following example stores a pointer to a struct
+        in a Python object and gets the pointer back in
+        another function.
+      </p>
+
+<pre><code>struct Data {
+    int x;
+    int y;
+};
+
+// The __init__ method of the Python Data class
+Wg_Obj* DataInit(Wg_Context* ctx, Wg_Obj** argv, int argc) {
+    if (argc != 1) {
+        // Raise error
+    }
+
+    // Allocate and initialize a Data struct
+    Data* data = (Data*)malloc(sizeof(Data));
+    if (data == NULL) {
+        // Handle error
+    }
+    data->x = 3;
+    data->y = 4;
+    
+    // Store the pointer in self
+    Wg_SetUserdata(argv[0], data);
+
+    // Register a cleanup function to be
+    // called when the object is garbage collected.
+    // data will be passed as an argument to free.
+    Wg_RegisterFinalizer(argv[0], free, data);
+
+    // Since this is the __init__ function, we return None
+    // as we usually do (although implicitly) in Python.
+    return Wg_None(ctx);
+}
+
+Wg_Obj* PrintData(Wg_Context* ctx, Wg_Obj** argv, int argc) {
+    if (argc != 1) {
+        // Raise error
+    }
+
+    // Validate that the argument is a Data object.
+    // The second argument is the name of the class
+    // given to Wg_NewClass.
+    void* userdata = NULL;
+    if (!Wg_GetUserdata(argv[0], "Data", &userdata)) {
+        // Handle error
+    }
+
+    // Print the data
+    Data* data = (Data*)userdata;
+    printf("(x = %d, y = %d)", data->x, data->y);
+
+    return Wg_None(ctx);
+}
+
+void RunExample(Wg_Context* ctx) {
+    // Embed the PrintData function
+    Wg_Obj* printData = Wg_NewFunction(ctx, PrintData, NULL, NULL);
+    if (printData == NULL) {
+        // Handle error
+    }
+    Wg_SetGlobal(ctx, "print_data", printData);
+
+    // Create a Python class to hold the Data struct
+    Wg_Obj* dataClass = Wg_NewClass(ctx, "Data", NULL, NULL);
+    if (dataClass == NULL) {
+        // Handle error
+    }
+    Wg_SetGlobal(ctx, "Data", dataClass);
+
+    // Bind the __init__ method to the class
+    if (Wg_BindMethod(dataClass, "__init__", DataInit, NULL) == NULL) {
+        // Handle error
+    }
+    
+    // Call the print_data function
+    const char* code =
+        "data = Data()\n"
+        "print_data(data)";
+    if (!Wg_Execute(ctx, code, NULL)) {
+        // Handle error
+    }
+}</code></pre>
+
+      Output
+      <pre><samp>(x = 3, y = 4)</samp></pre>
+      
     </div>
   </div>
 
