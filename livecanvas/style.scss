@@ -1,0 +1,37 @@
+@import "../global/style";
+
+.lc {
+    width: 75%;
+    max-width: 550px;
+    margin: 0 auto;
+}
+
+.label {
+    width: 75%;
+    max-width: 550px;
+    margin: 20px auto;
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+    background-color: $inset;
+}
+
+#address {
+    display: block;
+    width: 75%;
+    max-width: 550px;
+    margin: 20px auto;
+    padding: 5px;
+    text-align: center;
+    border-radius: 5px;
+    border-style: solid;
+    border-color: transparent;
+    border-width: 1px;
+    background-color: $inset;
+    color: $dark;
+}
+
+#address:focus {
+    outline: none;
+    border-color: $dark;
+}
