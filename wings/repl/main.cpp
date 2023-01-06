@@ -17,9 +17,13 @@ static std::string mystdout;
 static bool shouldExit;
 static Wg_Obj* sysexit;
 
-
 static Wg_Obj* Clear(Wg_Context* ctx, Wg_Obj**, int) {
 	emscripten_run_script("clearConsole();");
+	return Wg_None(ctx);
+}
+
+static Wg_Obj* Version(Wg_Context* ctx, Wg_Obj**, int) {
+	Wg_PrintString(ctx, "Wings v0.2.1\n");
 	return Wg_None(ctx);
 }
 
@@ -34,9 +38,6 @@ extern "C" {
 		};
 		
 		ctx = Wg_CreateContext(&cfg);
-		if (ctx == nullptr) {
-			return 1;
-		}
 
 		sysexit = Wg_GetGlobal(ctx, "SystemExit");
 		Wg_IncRef(sysexit);
@@ -48,14 +49,16 @@ extern "C" {
 		}
 		Wg_SetGlobal(ctx, "clear", clear);
 
+		Wg_Obj* version = Wg_NewFunction(ctx, Version, nullptr, "version");
+		if (version == nullptr) {
+			Wg_DestroyContext(ctx);
+			return 1;
+		}
+		Wg_SetGlobal(ctx, "version", version);
+
 		// This context is only used to check if strings
 		// are expressions rather than a set of statements.
 		exprChecker = Wg_CreateContext();
-		if (exprChecker == nullptr) {
-			Wg_DestroyContext(ctx);
-			ctx = nullptr;
-			return 1;
-		}
 		return 0;
 	}
 

@@ -1,4 +1,4 @@
 var annotated_dup =
 [
-    [ "Wg_Config", "structWg__Config.html", "structWg__Config" ]
+    [ "Wg_Config", "struct_wg___config.html", "struct_wg___config" ]
 ];

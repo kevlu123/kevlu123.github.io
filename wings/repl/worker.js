@@ -37,10 +37,16 @@ onmessage = (event) => {
 	
 	let code = event.data.code;
 	let ptr = allocateUTF8(code);
-	_Execute(ptr);
-	_free(ptr);
+	let thrown = false;
+	try {
+		_Execute(ptr);
+	} catch (e) {
+		thrown = true;
+	} finally {
+		_free(ptr);
+	}
 
-	if (_ShouldExit()) {
+	if (thrown || _ShouldExit()) {
 		_CloseRepl();
 		initialized = false;
 		post("status", "Exited");

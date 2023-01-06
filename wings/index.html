@@ -128,19 +128,13 @@ int main() {
     // Create a context with the default configuration.
     // The context contains the state of the interpreter.
     Wg_Context* ctx = Wg_CreateContext(NULL);
-    if (ctx == NULL) {
-        printf("Failed to create context.\n");
-        goto cleanup;
-    }
 
     // Run some Python code.
     if (!Wg_Execute(ctx, "print('Hello, World!')", NULL)) {
         printf("Error: %s\n", Wg_GetErrorMessage(ctx));
-        goto cleanup;
     }
 
-cleanup:
-    if (ctx) Wg_DestroyContext(ctx);
+    Wg_DestroyContext(ctx);
     return 0;
 }</code></pre>
 
@@ -221,15 +215,6 @@ printf("%lld + %lld = %lld\n", xv, yv, zv);
         the exception or error message can be retrieved via
         <code>Wg_GetException()</code> or <code>Wg_GetErrorMessage()</code>
         respectively.
-      </p>
-      <p>
-        There is one exception to this rule;
-        If <code>Wg_CreateContext()</code> fails, you cannot
-        get the error message since a valid context is required
-        to call the error reporting functions.
-        Luckily, the only way <code>Wg_CreateContext()</code>
-        can fail is if it fails to allocate enough Python objects
-        to initialize the interpreter.
       </p>
       <p>
         When an exception occurs, you should either handle it

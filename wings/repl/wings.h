@@ -4,6 +4,7 @@
 * 
 * @brief The wings API.
 */
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -536,9 +537,10 @@ typedef enum Wg_Exc {
 * @brief Create an instance of an interpreter.
 * 
 * The returned context must be freed with Wg_DestroyContext().
+* This function does not fail.
 * 
 * @param config The configuration to use, or NULL to use the default configuration.
-* @return A newly created context, or NULL on failure.
+* @return A newly created context.
 */
 WG_DLL_EXPORT
 Wg_Context* Wg_CreateContext(const Wg_Config* config WG_DEFAULT_ARG(nullptr));
@@ -641,7 +643,7 @@ void Wg_SetErrorCallback(Wg_ErrorCallback callback);
 * @param context The associated context.
 * @return The current error string.
 * 
-* @see Wg_GetException, Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject
+* @see Wg_GetException, Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 const char* Wg_GetErrorMessage(Wg_Context* context);
@@ -652,7 +654,7 @@ const char* Wg_GetErrorMessage(Wg_Context* context);
 * @param context The associated context.
 * @return The current exception object, or NULL if there is no exception.
 * 
-* @see Wg_GetErrorMessage, Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject
+* @see Wg_GetErrorMessage, Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetException(Wg_Context* context);
@@ -666,7 +668,7 @@ Wg_Obj* Wg_GetException(Wg_Context* context);
 * @param type The exception type.
 * @param message The error message, or NULL for an empty string.
 * 
-* @see Wg_RaiseExceptionClass, Wg_RaiseExceptionObject
+* @see Wg_RaiseExceptionClass, Wg_RaiseExceptionObject, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message WG_DEFAULT_ARG(nullptr));
@@ -681,7 +683,7 @@ void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message WG_
 * @param klass The exception class.
 * @param message The error message, or NULL for an empty string.
 * 
-* @see Wg_RaiseException, Wg_RaiseExceptionObject
+* @see Wg_RaiseException, Wg_RaiseExceptionObject, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message WG_DEFAULT_ARG(nullptr));
@@ -695,10 +697,24 @@ void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message WG_DEFAULT_ARG(nu
 *
 * @param obj The exception object to raise. The type must be a subclass of BaseException.
 * 
-* @see Wg_RaiseException, Wg_RaiseExceptionClass
+* @see Wg_RaiseException, Wg_RaiseExceptionClass, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 void Wg_RaiseExceptionObject(Wg_Obj* obj);
+
+/**
+* @brief Raise an existing exception object without affecting the stack trace.
+*
+* The object's type must derive from BaseException, otherwise a TypeError is raised.
+*
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param obj The exception object to raise. The type must be a subclass of BaseException.
+*
+* @see Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject
+*/
+WG_DLL_EXPORT
+void Wg_ReraiseExceptionObject(Wg_Obj* obj);
 
 /**
 * @brief Raise a TypeError with a formatted message.
@@ -1254,31 +1270,47 @@ WG_DLL_EXPORT
 void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata WG_DEFAULT_ARG(nullptr));
 
 /**
-* @brief Get an attribute of an object if it exists.
+* @brief Check if an object has an attribute.
 *
-* @param obj The object to get the attribute from.
-* @param attribute The attribute to get.
-* @return The attribute value, or NULL if the attribute does not exist.
+* @param obj The object to check.
+* @param attribute The attribute to check.
+* @return A boolean indicating whether the object has the attribute.
 * 
-* @see Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_SetAttribute
+* @see Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_GetAttributeNoExcept, Wg_SetAttribute
 */
 WG_DLL_EXPORT
-Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute);
+bool Wg_HasAttribute(Wg_Obj* obj, const char* attribute);
 
 /**
 * @brief Get an attribute of an object.
 * If the attribute does not exist, an AttributeError is raised.
-* 
-* To get an attribute without raising an AttributeError, see Wg_HasAttribute().
+* If the attribute is an unbound method object,
+* a new method object is allocated with obj bound.
+* If this allocation fails, a MemoryError is raised.
 * 
 * @param obj The object to get the attribute from.
 * @param attribute The attribute to get.
-* @return The attribute value, or NULL if the attribute does not exist.
+* @return The attribute value, or NULL if the attribute
+*		  does not exist or there is an error.
 * 
-* @see Wg_GetAttributeFromBase, Wg_SetAttribute, Wg_GetException, Wg_GetErrorMessage
+* @see Wg_HasAttribute, Wg_GetAttributeFromBase, Wg_GetAttributeNoExcept, Wg_SetAttribute, Wg_GetException, Wg_GetErrorMessage
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute);
+
+/**
+* @brief Get an attribute of an object.
+* Unlike, Wg_GetAttribute(), this function does not raise exceptions.
+* @warning This function will not bind unbound method objects to obj.
+*
+* @param obj The object to get the attribute from.
+* @param attribute The attribute to get.
+* @return The attribute value, or NULL if the attribute does not exist.
+*
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_SetAttribute
+*/
+WG_DLL_EXPORT
+Wg_Obj* Wg_GetAttributeNoExcept(Wg_Obj* obj, const char* attribute);
 
 /**
 * @brief Set an attribute of an object.
@@ -1287,7 +1319,7 @@ Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute);
 * @param attribute The attribute to set.
 * @param value The attribute value.
 * 
-* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeNoExcept, Wg_GetAttributeFromBase
 */
 WG_DLL_EXPORT
 void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value);
@@ -1303,7 +1335,7 @@ void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value);
 * @param baseClass The base class to search in, or NULL to search in all bases.
 * @return The attribute value, or NULL if the attribute does not exist.
 * 
-* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeNoExcept, Wg_SetAttribute
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* attribute, Wg_Obj* baseClass WG_DEFAULT_ARG(nullptr));
@@ -1591,11 +1623,6 @@ bool Wg_ImportAllFromModule(Wg_Context* context, const char* module);
 
 ///////////////// Implementation ////////////////////////
 #ifdef WINGS_IMPL
-
-namespace wings {
-	bool ImportBuiltins(Wg_Context* context);
-}
-
 #include <memory>
 
 namespace wings {
@@ -1610,6 +1637,119 @@ namespace wings {
 	RcPtr<T> MakeRcPtr(Args&&... args) {
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
+}
+
+
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <cstdlib>
+
+namespace wings {
+
+	struct AttributeTable {
+		AttributeTable();
+		AttributeTable(const AttributeTable&) = delete;
+		AttributeTable(AttributeTable&&) = default;
+		AttributeTable& operator=(const AttributeTable&) = delete;
+		AttributeTable& operator=(AttributeTable&&) = default;
+		
+		Wg_Obj* Get(const std::string& name) const;
+		Wg_Obj* GetFromBase(const std::string& name) const;
+		void Set(const std::string& name, Wg_Obj* value);
+		
+		void AddParent(AttributeTable& parent);
+		AttributeTable Copy();
+		template <class Fn> void ForEach(Fn fn) const;
+	private:		
+		struct Table {
+			Wg_Obj* Get(const std::string& name) const;
+			template <class Fn> void ForEach(Fn fn) const;
+			std::unordered_map<std::string, Wg_Obj*> entries;
+			std::vector<RcPtr<Table>> parents;
+		};
+
+		void Mutate();
+
+		RcPtr<Table> attributes;
+		bool owned;
+	};
+
+	template <class Fn>
+	void AttributeTable::ForEach(Fn fn) const {
+		attributes->ForEach(fn);
+	}
+
+	template <class Fn>
+	void AttributeTable::Table::ForEach(Fn fn) const {
+		for (const auto& [_, val] : entries)
+			fn(val);
+
+		for (const auto& parent : parents)
+			parent->ForEach(fn);
+	}
+}
+
+
+
+namespace wings {
+
+	AttributeTable::AttributeTable() :
+		attributes(MakeRcPtr<Table>()),
+		owned(true)
+	{
+	}
+
+	Wg_Obj* AttributeTable::Get(const std::string& name) const {
+		return attributes->Get(name);
+	}
+
+	Wg_Obj* AttributeTable::Table::Get(const std::string& name) const {
+		auto it = entries.find(name);
+		if (it != entries.end())
+			return it->second;
+
+		for (const auto& parent : parents)
+			if (Wg_Obj* val = parent->Get(name))
+				return val;
+
+		return nullptr;
+	}
+
+	Wg_Obj* AttributeTable::GetFromBase(const std::string& name) const {
+		for (const auto& parent : attributes->parents)
+			if (Wg_Obj* val = parent->Get(name))
+				return val;
+		return nullptr;
+	}
+
+	void AttributeTable::Set(const std::string& name, Wg_Obj* value) {
+		Mutate();
+		attributes->entries[name] = value;
+	}
+
+	void AttributeTable::AddParent(AttributeTable& parent) {
+		attributes->parents.push_back(parent.attributes);
+	}
+
+	AttributeTable AttributeTable::Copy() {
+		AttributeTable copy;
+		copy.attributes = attributes;
+		copy.owned = false;
+		return copy;
+	}
+
+	void AttributeTable::Mutate() {
+		if (!owned) {
+			attributes = MakeRcPtr<Table>(*attributes);
+			owned = true;
+		}
+	}
+}
+
+
+namespace wings {
+	bool ImportBuiltins(Wg_Context* context);
 }
 
 #include <stdint.h>
@@ -2027,58 +2167,6 @@ namespace wings {
 
 
 #include <string>
-#include <vector>
-#include <unordered_map>
-#include <cstdlib>
-
-namespace wings {
-
-	struct AttributeTable {
-		AttributeTable();
-		AttributeTable(const AttributeTable&) = delete;
-		AttributeTable(AttributeTable&&) = default;
-		AttributeTable& operator=(const AttributeTable&) = delete;
-		AttributeTable& operator=(AttributeTable&&) = default;
-		
-		Wg_Obj* Get(const std::string& name) const;
-		Wg_Obj* GetFromBase(const std::string& name) const;
-		void Set(const std::string& name, Wg_Obj* value);
-		
-		void AddParent(AttributeTable& parent);
-		AttributeTable Copy();
-		template <class Fn> void ForEach(Fn fn) const;
-	private:		
-		struct Table {
-			Wg_Obj* Get(const std::string& name) const;
-			template <class Fn> void ForEach(Fn fn) const;
-			std::unordered_map<std::string, Wg_Obj*> entries;
-			std::vector<RcPtr<Table>> parents;
-		};
-
-		void Mutate();
-
-		RcPtr<Table> attributes;
-		bool owned;
-	};
-
-	template <class Fn>
-	void AttributeTable::ForEach(Fn fn) const {
-		attributes->ForEach(fn);
-	}
-
-	template <class Fn>
-	void AttributeTable::Table::ForEach(Fn fn) const {
-		for (const auto& [_, val] : entries)
-			fn(val);
-
-		for (const auto& parent : parents)
-			parent->ForEach(fn);
-	}
-}
-
-
-
-#include <string>
 #include <string_view>
 #include <vector>
 #include <deque>
@@ -2090,6 +2178,7 @@ namespace wings {
 #include <cstdlib>
 #include <atomic>
 #include <random>
+#include <variant>
 
 static_assert(sizeof(Wg_int) == sizeof(Wg_uint));
 
@@ -2104,7 +2193,6 @@ namespace wings {
 	bool IsValidIdentifier(std::string_view s);
 	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr);
 	Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module);
-	bool InitArgv(Wg_Context* context, const char* const* argv, int argc);
 	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr);
 	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
 	void AddAttributeToClass(Wg_Obj* klass, const char* attribute, Wg_Obj* value);
@@ -2282,6 +2370,18 @@ namespace wings {
 	};
 	
 	constexpr const char* DEFAULT_FUNC_NAME = "<unnamed>";
+	
+	template<typename VariantType, typename T, std::size_t index = 0>
+	constexpr std::size_t variant_index() {
+		static_assert(std::variant_size_v<VariantType> > index, "Type not found in variant");
+		if constexpr (index == std::variant_size_v<VariantType>) {
+			return index;
+		} else if constexpr (std::is_same_v<std::variant_alternative_t<index, VariantType>, T>) {
+			return index;
+		} else {
+			return variant_index<VariantType, T, index + 1>();
+		}
+	}
 }
 
 struct Wg_Obj {
@@ -2332,6 +2432,7 @@ struct Wg_Context {
 	wings::Rng rng;
 	bool closing = false;
 	bool gcRunning = false;
+	std::vector<std::string> argv;
 	
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
@@ -2342,7 +2443,6 @@ struct Wg_Context {
 	using Globals = std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>>;
 	std::unordered_map<std::string, Globals> globals;
 	wings::Builtins builtins{};
-	Wg_Obj* argv = nullptr;
 	
 	// Exception info
 	std::vector<wings::TraceFrame> currentTrace;
@@ -2368,7 +2468,7 @@ struct Wg_Context {
 #define WG_LINE_AS_STRING WG_STRINGIZE_HELPER(__LINE__)
 
 // Automatically define WG_NO_ASSERT if compiling in release mode in Visual Studio
-#if defined(_WIN32) && !defined(_DEBUG)
+#if (defined(_WIN32) && !defined(_DEBUG)) || defined(NDEBUG)
 	#ifndef WG_NO_ASSERT
 		#define WG_NO_ASSERT
 	#endif
@@ -6633,67 +6733,6 @@ class ValueError(Exception):
 } // namespace wings
 
 
-namespace wings {
-
-	AttributeTable::AttributeTable() :
-		attributes(MakeRcPtr<Table>()),
-		owned(true)
-	{
-	}
-
-	Wg_Obj* AttributeTable::Get(const std::string& name) const {
-		return attributes->Get(name);
-	}
-
-	Wg_Obj* AttributeTable::Table::Get(const std::string& name) const {
-		auto it = entries.find(name);
-		if (it != entries.end())
-			return it->second;
-
-		for (const auto& parent : parents)
-			if (Wg_Obj* val = parent->Get(name))
-				return val;
-
-		return nullptr;
-	}
-
-	Wg_Obj* AttributeTable::GetFromBase(const std::string& name) const {
-		for (const auto& parent : attributes->parents)
-			if (Wg_Obj* val = parent->Get(name))
-				return val;
-		return nullptr;
-	}
-
-	void AttributeTable::Set(const std::string& name, Wg_Obj* value) {
-		Mutate();
-		attributes->entries[name] = value;
-	}
-
-	void AttributeTable::AddParent(AttributeTable& parent) {
-		attributes->parents.push_back(parent.attributes);
-	}
-
-	AttributeTable AttributeTable::Copy() {
-		AttributeTable copy;
-		copy.attributes = attributes;
-		copy.owned = false;
-		return copy;
-	}
-
-	void AttributeTable::Mutate() {
-		if (!owned) {
-			attributes = MakeRcPtr<Table>(*attributes);
-			owned = true;
-		}
-	}
-}
-
-
-namespace wings {
-	bool ImportDis(Wg_Context* context);
-}
-
-
 #include <vector>
 #include <string>
 
@@ -6871,59 +6910,160 @@ namespace wings {
 
 namespace wings {
 
-	struct Statement {
-		enum class Type {
-			Root,
-			Pass,
-			Expr,
-			Nonlocal, Global,
-			Def, Class, Return,
-			If, Elif, Else,
-			While, For,
-			Try, Except, Finally, Raise,
-			Break, Continue,
-			Composite,
-			Import, ImportFrom,
-		} type;
+	namespace stat {
+		struct Root {
+			Expression expr;
+		};
+		
+		struct Def {
+			Expression expr;
+		};
 
-		SourcePosition srcPos;
-		Expression expr;
-		std::vector<Statement> body;
-		std::unique_ptr<Statement> elseClause;
-
-		struct {
-			AssignTarget assignTarget;
-		} forLoop;
-		struct {
-			std::string name;
-		} capture;
-		struct {
+		struct Class {
 			std::string name;
 			std::vector<std::string> methodNames;
 			std::vector<Expression> bases;
-		} klass;
-		struct {
-			std::vector<Statement> exceptClauses;
-			std::vector<Statement> finallyClause;
-		} tryBlock;
-		struct {
-			std::string var;
-			std::optional<Expression> exceptType;
-		} exceptBlock;
-		struct {
+			std::vector<Statement> body;
+		};
+		
+		struct Pass {};
+		
+		struct Expr {
+			Expression expr;
+		};
+
+		struct Else {
+			std::vector<Statement> body;
+		};
+
+		struct If {
+			Expression expr;
+			std::vector<Statement> body;
+			std::unique_ptr<Statement> elseClause;
+		};
+
+		struct Elif {
+			Expression expr;
+			std::vector<Statement> body;
+			std::unique_ptr<Statement> elseClause;
+		};
+		
+		struct While {
+			Expression expr;
+			std::vector<Statement> body;
+			std::unique_ptr<Statement> elseClause;
+		};
+
+		struct For {
+			Expression expr;
+			AssignTarget assignTarget;
+			std::vector<Statement> body;
+			std::unique_ptr<Statement> elseClause;
+		};
+
+		struct Try {
+			std::vector<Statement> body;
+			std::vector<Statement> exceptBlocks;
+			std::vector<Statement> finallyBody;
+		};
+
+		struct Except {
+			std::vector<Statement> body;
+			std::optional<Expression> type;
+			std::string variable;
+		};
+
+		struct Finally {
+			std::vector<Statement> body;
+		};
+
+		struct Raise {
+			Expression expr;
+		};
+
+		struct Import {
 			std::string module;
 			std::string alias;
-		} import;
-		struct {
+		};
+
+		struct ImportFrom {
 			std::string module;
 			std::vector<std::string> names;
 			std::string alias;
-		} importFrom;
+		};
+
+		struct Break {
+			size_t finallyCount = 0;
+			bool exitForLoopNormally = false;
+		};
+
+		struct Continue {
+			size_t finallyCount = 0;
+		};
+
+		struct Return {
+			size_t finallyCount = 0;
+			Expression expr;
+		};
+
+		struct Composite {
+			std::vector<Statement> body;
+		};
+
+		struct NonLocal {
+			std::string name;
+		};
+
+		struct Global {
+			std::string name;
+		};
+	}
+
+	using StatData = std::variant<
+		std::monostate,
+		stat::Root,
+		stat::Def,
+		stat::Class,
+		stat::Pass,
+		stat::Expr,
+		stat::If,
+		stat::Elif,
+		stat::Else,
+		stat::While,
+		stat::For,
+		stat::Try,
+		stat::Except,
+		stat::Finally,
+		stat::Raise,
+		stat::Import,
+		stat::ImportFrom,
+		stat::Break,
+		stat::Continue,
+		stat::Return,
+		stat::Composite,
+		stat::NonLocal,
+		stat::Global
+	>;
+
+	struct Statement {
+		SourcePosition srcPos;
+		StatData data;
+		
+		template <class T> T& Get() { return std::get<T>(data); }
+		template <class T> const T& Get() const { return std::get<T>(data); }
+		template <class T> T* GetIf() { return std::get_if<T>(&data); }
+		template <class T> const T* GetIf() const { return std::get_if<T>(&data); }
+		template <class T> bool Is() const { return std::holds_alternative<T>(data); }
 	};
+
+	template <class T>
+	constexpr size_t StatIndex() {
+		return variant_index<StatData, T>();
+	}
 
 	struct ParseResult {
 		CodeError error;
-		Statement parseTree; // Root is treated similar to a def
+		stat::Root parseTree;
 	};
 
 	ParseResult Parse(const LexTree& lexTree);
@@ -6931,7 +7071,7 @@ namespace wings {
 	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr);
 	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out);
 	CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple);
-	Statement TransformForToWhile(Statement forLoop);
+	Statement TransformForToWhile(stat::For forLoop);
 	void ExpandCompositeStatements(std::vector<Statement>& statements);
 
 }
@@ -6982,6 +7122,11 @@ namespace wings {
 		size_t finallyJump;
 	};
 
+	struct QueuedJumpInstruction {
+		size_t location;
+		size_t finallyCount;
+	};
+
 	struct ImportInstruction {
 		std::string module;
 		std::string alias;
@@ -7017,13 +7162,15 @@ namespace wings {
 			JumpIfFalse,
 			JumpIfTrue,
 			Return,
+			QueueJump,
 
 			Raise,
 			PushTry,
 			PopTry,
-			Except,
+			ClearException,
 			CurrentException,
 			IsInstance,
+			EndFinally,
 
 			Call,
 			PushArgFrame,
@@ -7040,13 +7187,14 @@ namespace wings {
 		std::unique_ptr<ClassInstruction> klass;
 		std::unique_ptr<JumpInstruction> jump;
 		std::unique_ptr<TryFrameInstruction> pushTry;
+		std::unique_ptr<QueuedJumpInstruction> queuedJump;
 		std::unique_ptr<ImportInstruction> import;
 		std::unique_ptr<ImportFromInstruction> importFrom;
 
 		SourcePosition srcPos;
 	};
 
-	std::vector<Instruction> Compile(const Statement& parseTree);
+	std::vector<Instruction> Compile(const stat::Root& parseTree);
 }
 
 
@@ -7076,8 +7224,8 @@ namespace wings {
 	struct TryFrame {
 		size_t exceptJump;
 		size_t finallyJump;
-		bool isHandlingException;
 		size_t stackSize;
+		bool exceptTaken;
 	};
 
 	struct Executor {
@@ -7091,13 +7239,13 @@ namespace wings {
 		Wg_Obj* PeekStack();
 		void ClearStack();
 		size_t PopArgFrame();
-
+		Wg_Obj* DirectAssign(const AssignTarget& target, Wg_Obj* value);
+		void DequeueJump();
 		void DoInstruction(const Instruction& instr);
 
 		Wg_Obj* GetVariable(const std::string& name);
 		void SetVariable(const std::string& name, Wg_Obj* value);
 
-		Wg_Obj* DirectAssign(const AssignTarget& target, Wg_Obj* value);
 
 		DefObject* def;
 		Wg_Context* context;
@@ -7106,3794 +7254,14 @@ namespace wings {
 		std::stack<size_t> argFrames;
 		std::vector<std::vector<Wg_Obj*>> kwargsStack;
 		std::unordered_map<std::string, RcPtr<Wg_Obj*>> variables;
-		std::optional<Wg_Obj*> exitValue;
+		Wg_Obj* returnValue;
 
-		std::stack<TryFrame> tryFrames;
+		std::vector<TryFrame> tryFrames;
+		Wg_Obj* storedException = nullptr;
+		size_t queuedFinallyCount = 0;
+		size_t queuedJump = 0;
 	};
 
-}
-
-
-#include <queue>
-
-namespace wings {
-	namespace dismodule {
-		static std::string AssignTargetToString(const AssignTarget& target) {
-			if (target.type == AssignType::Direct) {
-				return target.direct;
-			} else {
-				std::string s = "(";
-				for (const auto& child : target.pack) {
-					s += AssignTargetToString(child);
-					s += ", ";
-				}
-				s.pop_back();
-				s.pop_back();
-				return s;
-			}
-		}
-
-		static std::string LiteralToString(const LiteralInstruction& literal) {
-			if (std::holds_alternative<std::nullptr_t>(literal)) {
-				return "None";
-			} else if (std::holds_alternative<bool>(literal)) {
-				return std::get<bool>(literal) ? "True" : "False";
-			} else if (std::holds_alternative<Wg_int>(literal)) {
-				return std::to_string(std::get<Wg_int>(literal));
-			} else if (std::holds_alternative<Wg_float>(literal)) {
-				return std::to_string(std::get<Wg_float>(literal));
-			} else if (std::holds_alternative<std::string>(literal)) {
-				return "\"" + std::get<std::string>(literal) + "\"";
-			} else {
-				WG_UNREACHABLE();
-			}
-		}
-
-		static std::string PadLeft(size_t i, size_t size) {
-			auto n = std::to_string(i);
-			while (n.size() < size)
-				n.insert(0, 1, ' ');
-			return n;
-		}
-
-		static Wg_Obj* dis(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_FUNC(0);
-
-			const auto& fn = argv[0]->Get<Wg_Obj::Func>();
-			if (fn.fptr != &DefObject::Run) {
-				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Cannot disassemble native function");
-				return nullptr;
-			}
-
-			struct Func {
-				const std::vector<Instruction>* instructions;
-				std::string_view name;
-			};
-
-			std::queue<Func> functions;
-			DefObject* def = (DefObject*)fn.userdata;
-			functions.push(Func{ &*def->instructions, def->prettyName });
-
-			std::string s;
-			while (!functions.empty()) {
-				s += "Function ";
-				s += functions.front().name;
-				s += "()\n";
-				const auto* instructions = functions.front().instructions;
-				functions.pop();
-
-				for (size_t i = 0; i < instructions->size(); i++) {
-					const Instruction& instr = (*instructions)[i];
-
-					if (i == 0 || instr.srcPos.line != (*instructions)[i - 1].srcPos.line) {
-						if (i)
-							s += "\n";
-						s += PadLeft(instr.srcPos.line + 1, 6) + " ";
-					} else {
-						s += "       ";
-					}
-					s += PadLeft(i, 4) + " ";
-
-					switch (instr.type) {
-					case Instruction::Type::DirectAssign:
-						if (instr.directAssign->assignTarget.type == AssignType::Direct) {
-							s += "ASSIGN\t\t";
-						} else {
-							s += "ASSIGN_PACK\t\t";
-						}
-						s += AssignTargetToString(instr.directAssign->assignTarget);
-						break;
-					case Instruction::Type::MemberAssign:
-						s += "ASSIGN_ATTR\t\t" + instr.string->string;
-						break;
-					case Instruction::Type::Literal:
-						s += "LOAD_CONST\t\t" + LiteralToString(*instr.literal);
-						break;
-					case Instruction::Type::Call:
-						s += "CALL";
-						break;
-					case Instruction::Type::Return:
-						s += "RETURN";
-						break;
-					case Instruction::Type::Pop:
-						s += "POP";
-						break;
-					case Instruction::Type::PushArgFrame:
-						s += "BEGIN_ARGS";
-						break;
-					case Instruction::Type::Dot:
-						s += "GET_ATTR\t\t" + instr.string->string;
-						break;
-					case Instruction::Type::Variable:
-						s += "LOAD_VAR\t\t" + instr.string->string;
-						break;
-					case Instruction::Type::Jump:
-						s += "JUMP\t\tto " + std::to_string(instr.jump->location);
-						break;
-					case Instruction::Type::JumpIfFalsePop:
-						s += "JUMP_IF_FALSE_POP\tto " + std::to_string(instr.jump->location);
-						break;
-					case Instruction::Type::JumpIfFalse:
-						s += "JUMP_IF_FALSE\tto " + std::to_string(instr.jump->location);
-						break;
-					case Instruction::Type::JumpIfTrue:
-						s += "JUMP_IF_TRUE\tto " + std::to_string(instr.jump->location);
-						break;
-					case Instruction::Type::List:
-						s += "MAKE_LIST";
-						break;
-					case Instruction::Type::Tuple:
-						s += "MAKE_TUPLE";
-						break;
-					case Instruction::Type::Map:
-						s += "MAKE_DICT";
-						break;
-					case Instruction::Type::Set:
-						s += "MAKE_SET";
-						break;
-					case Instruction::Type::Slice:
-						s += "MAKE_SLICE";
-						break;
-					case Instruction::Type::Raise:
-						s += "RAISE";
-						break;
-					case Instruction::Type::PushTry:
-						s += "BEGIN_TRY\t\t" + std::to_string(instr.pushTry->exceptJump)
-							+ ", " + std::to_string(instr.pushTry->finallyJump);
-						break;
-					case Instruction::Type::PopTry:
-						s += "END_TRY";
-						break;
-					case Instruction::Type::CurrentException:
-						s += "LOAD_CUR_EXCEPT";
-						break;
-					case Instruction::Type::IsInstance:
-						s += "LOAD_IS_INSTANCE";
-						break;
-					case Instruction::Type::Except:
-						s += "HANDLE_EXCEPT";
-						break;
-					case Instruction::Type::Import:
-						s += "IMPORT\t\t" + instr.import->module;
-						if (!instr.import->alias.empty())
-							s += " as " + instr.import->alias;
-						break;
-					case Instruction::Type::ImportFrom:
-						if (instr.importFrom->names.empty()) {
-							s += "IMPORT_ALL\t\t" + instr.importFrom->module;
-						} else if (!instr.importFrom->alias.empty()) {
-							s += "IMPORT_FROM\t\tfrom " + instr.importFrom->module
-								+ " import " + instr.importFrom->names[0]
-								+ " as " + instr.importFrom->alias;
-						} else {
-							s += "IMPORT_FROM\t\tfrom " + instr.importFrom->module + " import ";
-							for (const auto& name : instr.importFrom->names) {
-								s += name + ", ";
-							}
-							s.pop_back();
-							s.pop_back();
-						}
-						break;
-					case Instruction::Type::Is:
-						s += "IS";
-						break;
-					case Instruction::Type::PushKwarg:
-						s += "PUSH_KWARG";
-						break;
-					case Instruction::Type::UnpackMapForCall:
-						s += "UNPACK_KWARGS";
-						break;
-					case Instruction::Type::UnpackMapForMapCreation:
-						s += "UNPACK_DICT";
-						break;
-					case Instruction::Type::Unpack:
-						s += "UNPACK_ITERABLE";
-						break;
-					case Instruction::Type::Class:
-						s += "MAKE_CLASS\t\t" + instr.klass->prettyName + " [";
-						for (const auto& name : instr.klass->methodNames) {
-							s += name + ", ";
-						}
-						s.pop_back();
-						s.pop_back();
-						s += "]";
-						break;
-					case Instruction::Type::Def:
-						s += "MAKE_FUNCTION\t" + instr.def->prettyName;
-
-						functions.push(Func{ &*instr.def->instructions, instr.def->prettyName });
-						break;
-					default:
-						s += "???";
-						break;
-					}
-
-					s += "\n";
-				}
-
-				s += "\n";
-			}
-
-			Wg_Print(context, s.c_str(), (int)s.size());
-
-			return Wg_None(context);
-		}
-	}
-
-	bool ImportDis(Wg_Context* context) {
-		using namespace dismodule;
-		try {
-			RegisterFunction(context, "dis", dis);
-			return true;
-		} catch (LibraryInitException&) {
-			return false;
-		}
-	}
-}
-
-
-namespace wings {
-	bool ImportTime(Wg_Context* context);
-}
-
-
-#include <chrono>
-#include <thread>
-
-namespace wings {
-	namespace timemodule {
-		static Wg_Obj* sleep(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			Wg_float secs = Wg_GetFloat(argv[0]);
-			int ms = (int)(secs * 1000);
-			std::this_thread::sleep_for(std::chrono::milliseconds(ms));
-			return Wg_None(context);
-		}
-
-		static Wg_Obj* time(Wg_Context* context, Wg_Obj**, int argc) {
-			WG_EXPECT_ARG_COUNT(0);
-			auto now = std::chrono::system_clock::now();
-			auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-			auto value = now_ms.time_since_epoch();
-			return Wg_NewFloat(context, (Wg_float)value.count() / 1000);
-		}
-	}
-	
-	bool ImportTime(Wg_Context* context) {
-		using namespace timemodule;
-		try {
-			RegisterFunction(context, "time", time);
-			RegisterFunction(context, "sleep", sleep);
-			
-			return true;
-		} catch (LibraryInitException&) {
-			return false;
-		}
-	}
-}
-
-
-#include <unordered_map>
-#include <functional>
-#include <algorithm>
-#include <iterator>
-
-namespace wings {
-
-	static thread_local std::vector<Statement::Type> statementHierarchy;
-
-	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out);
-
-	static CodeError CheckTrailingTokens(const TokenIter& p) {
-		if (!p.EndReached()) {
-			return CodeError::Bad("Unexpected trailing tokens", p->srcPos);
-		} else {
-			return CodeError::Good();
-		}
-	}
-
-	static CodeError ExpectColonEnding(TokenIter& p) {
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
-		} else if (p->text != ":") {
-			return CodeError::Bad("Expected a ':'", p->srcPos);
-		}
-		++p;
-
-		return CheckTrailingTokens(p);
-	}
-
-	static CodeError ParseConditionalBlock(const LexTree& node, Statement& out, Statement::Type type) {
-		TokenIter p(node.tokens);
-		++p;
-
-		if (auto error = ParseExpression(p, out.expr)) {
-			return error;
-		}
-
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		out.type = type;
-		return ParseBody(node, type, out.body);
-	}
-
-	static CodeError ParseIf(const LexTree& node, Statement& out) {
-		return ParseConditionalBlock(node, out, Statement::Type::If);
-	}
-
-	static CodeError ParseElif(const LexTree& node, Statement& out) {
-		return ParseConditionalBlock(node, out, Statement::Type::Elif);
-	}
-
-	static CodeError ParseElse(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		++p;
-
-		out.type = Statement::Type::Else;
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		return ParseBody(node, Statement::Type::Else, out.body);
-	}
-
-	static CodeError ParseWhile(const LexTree& node, Statement& out) {
-		return ParseConditionalBlock(node, out, Statement::Type::While);
-	}
-
-	static CodeError ParseVariableList(TokenIter& p, std::vector<std::string>& out) {
-		out.clear();
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
-		} else if (p->type != Token::Type::Word) {
-			return CodeError::Bad("Expected a variable name", p->srcPos);
-		}
-
-		while (true) {
-			out.push_back(p->text);
-			++p;
-
-			if (p.EndReached()) {
-				return CodeError::Good();
-			} else if (p->text != ",") {
-				return CodeError::Good();
-			} 
-			++p;
-
-			if (p.EndReached()) {
-				return CodeError::Good();
-			} else if (p->type != Token::Type::Word) {
-				return CodeError::Good();
-			}
-		}
-	}
-
-	Statement TransformForToWhile(Statement forLoop) {
-		// __VarXXX = expression.__iter__()
-		std::string rangeVarName = "__For" + std::to_string(Guid());
-
-		Expression loadIter{};
-		loadIter.srcPos = forLoop.expr.srcPos;
-		loadIter.operation = Operation::Dot;
-		loadIter.variableName = "__iter__";
-		loadIter.children.push_back(std::move(forLoop.expr));
-
-		Expression callIter{};
-		callIter.srcPos = forLoop.expr.srcPos;
-		callIter.operation = Operation::Call;
-		callIter.children.push_back(std::move(loadIter));
-		
-		Statement rangeEval{};
-		rangeEval.srcPos = forLoop.expr.srcPos;
-		rangeEval.type = Statement::Type::Expr;
-		rangeEval.expr.operation = Operation::Assign;
-		rangeEval.expr.srcPos = forLoop.expr.srcPos;
-		rangeEval.expr.assignTarget.type = AssignType::Direct;
-		rangeEval.expr.assignTarget.direct = rangeVarName;
-		rangeEval.expr.children.push_back({}); // Dummy
-		rangeEval.expr.children.push_back(std::move(callIter));
-
-		// while True:
-		Expression condition{};
-		condition.srcPos = forLoop.expr.srcPos;
-		condition.operation = Operation::Literal;
-		condition.literalValue.type = LiteralValue::Type::Bool;
-		condition.literalValue.b = true;
-
-		Statement wh{};
-		wh.srcPos = forLoop.expr.srcPos;
-		wh.type = Statement::Type::While;
-		wh.expr = std::move(condition);
-
-		// try:
-		//		__VarXXX = __VarXXX.__next__()
-		// except StopIteration:
-		//		break
-		Statement brk{};
-		brk.srcPos = forLoop.expr.srcPos;
-		brk.type = Statement::Type::Break;
-
-		Expression stopIter{};
-		stopIter.srcPos = forLoop.expr.srcPos;
-		stopIter.operation = Operation::Variable;
-		stopIter.variableName = "StopIteration";
-
-		Statement except{};
-		except.srcPos = forLoop.expr.srcPos;
-		except.type = Statement::Type::Except;
-		except.exceptBlock.exceptType = std::move(stopIter);
-		except.body.push_back(std::move(brk));
-
-		Statement tryExcept{};
-		tryExcept.srcPos = forLoop.expr.srcPos;
-		tryExcept.type = Statement::Type::Try;
-		tryExcept.tryBlock.exceptClauses.push_back(std::move(except));
-
-		// vars = __VarXXX.__next__()
-		Expression rangeVar{};
-		rangeVar.srcPos = forLoop.expr.srcPos;
-		rangeVar.operation = Operation::Variable;
-		rangeVar.variableName = rangeVarName;
-
-		Expression loadNext{};
-		loadNext.srcPos = forLoop.expr.srcPos;
-		loadNext.operation = Operation::Dot;
-		loadNext.variableName = "__next__";
-		loadNext.children.push_back(std::move(rangeVar));
-
-		Expression callNext{};
-		callNext.srcPos = forLoop.expr.srcPos;
-		callNext.operation = Operation::Call;
-		callNext.children.push_back(std::move(loadNext));
-
-		Expression iterAssign{};
-		iterAssign.srcPos = forLoop.expr.srcPos;
-		iterAssign.operation = Operation::Assign;
-		iterAssign.assignTarget = forLoop.forLoop.assignTarget;
-		iterAssign.children.push_back({}); // Dummy
-		iterAssign.children.push_back(std::move(callNext));
-
-		Statement iterAssignStat{};
-		iterAssignStat.srcPos = forLoop.expr.srcPos;
-		iterAssignStat.type = Statement::Type::Expr;
-		iterAssignStat.expr = std::move(iterAssign);
-		tryExcept.body.push_back(std::move(iterAssignStat));
-
-		// Transfer body over
-		wh.body.push_back(std::move(tryExcept));
-		for (auto& child : forLoop.body)
-			wh.body.push_back(std::move(child));
-
-		Statement out{};
-		out.srcPos = forLoop.expr.srcPos;
-		out.type = Statement::Type::Composite;
-		out.body.push_back(std::move(rangeEval));
-		out.body.push_back(std::move(wh));
-		return out;
-	}
-
-	CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple) {
-		bool mustTerminate = false;
-		isTuple = false;
-		while (true) {
-			if (p.EndReached()) {
-				return CodeError::Bad("Expected 'in'", (--p)->srcPos);
-			} else if (p->text == "in") {
-				if (vars.empty()) {
-					return CodeError::Bad("Expected a variable name", p->srcPos);
-				} else {
-					return CodeError::Good();
-				}
-			} else if (mustTerminate) {
-				return CodeError::Bad("Expected 'in'", p->srcPos);
-			} else if (p->type != Token::Type::Word) {
-				return CodeError::Bad("Expected a variable name", p->srcPos);
-			}
-			vars.push_back(p->text);
-			++p;
-
-			if (!p.EndReached() && p->text == ",") {
-				isTuple = true;
-				++p;
-			} else {
-				mustTerminate = true;
-			}
-		}
-	}
-
-	static CodeError ParseFor(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		++p;
-		out.type = Statement::Type::For;
-
-		std::vector<std::string> vars;
-		bool isTuple{};
-		if (auto error = ParseForLoopVariableList(p, vars, isTuple)) {
-			return error;
-		}
-		++p;
-
-		if (!isTuple) {
-			out.forLoop.assignTarget.type = AssignType::Direct;
-			out.forLoop.assignTarget.direct = vars[0];
-		} else {
-			out.forLoop.assignTarget.type = AssignType::Pack;
-			for (auto& var : vars) {
-				AssignTarget elem{};
-				elem.type = AssignType::Direct;
-				elem.direct = std::move(var);
-				out.forLoop.assignTarget.pack.push_back(std::move(elem));
-			}
-		}
-
-		if (auto error = ParseExpression(p, out.expr)) {
-			return error;
-		}
-
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		if (auto error = ParseBody(node, Statement::Type::For, out.body)) {
-			return error;
-		}
-
-		out = TransformForToWhile(std::move(out));
-		return CodeError::Good();
-	}
-
-	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
-		out.clear();
-		Parameter::Type type = Parameter::Type::Named;
-		while (true) {
-			if (p.EndReached()) {
-				return CodeError::Good();
-			} else if (p->text == "*") {
-				if (type == Parameter::Type::ListArgs) {
-					return CodeError::Bad("Only 1 variadic arguments parameter is allowed", p->srcPos);
-				} else if (type == Parameter::Type::Kwargs) {
-					return CodeError::Bad("Keyword arguments parameter must appear last", p->srcPos);
-				}
-				type = Parameter::Type::ListArgs;
-				++p;
-			} else if (p->text == "**") {
-				if (type == Parameter::Type::Kwargs) {
-					return CodeError::Bad("Only 1 keyword arguments parameter is allowed", p->srcPos);
-				}
-				type = Parameter::Type::Kwargs;
-				++p;
-			} else if (p->type != Token::Type::Word) {
-				return CodeError::Good();
-			} else {
-				if (type != Parameter::Type::Named) {
-					return CodeError::Bad("Regular parameters must appear first", p->srcPos);
-				}
-			}
-
-			if (p.EndReached()) {
-				return CodeError::Bad("Expected a parameter name", (--p)->srcPos);
-			} else if (p->type != Token::Type::Word) {
-				return CodeError::Bad("Expected a parameter name", p->srcPos);
-			}
-
-			std::string parameterName = p->text;
-
-			// Check for duplicate parameters
-			if (std::find_if(out.begin(), out.end(), [&](const Parameter& p) {
-				return p.name == parameterName;
-				}) != out.end()) {
-				return CodeError::Bad("Duplicate parameter name", p->srcPos);
-			}
-			++p;
-
-			std::optional<Expression> defaultValue;
-			if (p.EndReached()) {
-				out.push_back(Parameter{ parameterName, std::nullopt, type });
-				return CodeError::Good();
-			} else if (p->text == "=") {
-				// Default value
-				if (type != Parameter::Type::Named) {
-					return CodeError::Bad("Only regular parameters can have a default argument", p->srcPos);
-				}
-				++p;
-				Expression expr{};
-				if (auto error = ParseExpression(p, expr)) {
-					return error;
-				}
-				defaultValue = std::move(expr);
-			} else if (!out.empty() && out.back().defaultValue) {
-				// If last parameter has a default value,
-				// this parameter must also have a default value
-				return CodeError::Bad(
-					"Parameters with default values must appear at the end of the parameter list",
-					(--p)->srcPos
-				);
-			}
-
-			out.push_back(Parameter{ std::move(parameterName), std::move(defaultValue), type });
-
-			if (p.EndReached()) {
-				return CodeError::Good();
-			} else if (p->text != ",") {
-				return CodeError::Good();
-			}
-			++p;
-		}
-	}
-
-	std::unordered_set<std::string> GetReferencedVariables(const AssignTarget& target) {
-		if (target.type == AssignType::Direct) {
-			return { target.direct };
-		} else {
-			std::unordered_set<std::string> variables;
-			for (const auto& child : target.pack)
-				variables.merge(GetReferencedVariables(child));
-			return variables;
-		}
-	}
-
-	// Get a set of variables referenced by an expression
-	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
-		std::unordered_set<std::string> variables;
-		if (expr.operation == Operation::Variable) {
-			variables.insert(expr.variableName);
-		} else {
-			for (const auto& child : expr.children) {
-				variables.merge(GetReferencedVariables(child));
-			}
-		}
-		return variables;
-	}
-
-	// Get a set of variables directly written to by the '=' operator. This excludes compound assignment.
-	static std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
-		if (expr.operation == Operation::Assign && (expr.assignTarget.type == AssignType::Direct || expr.assignTarget.type == AssignType::Pack)) {
-			return GetReferencedVariables(expr.assignTarget);
-		} else {
-			std::unordered_set<std::string> variables;
-			for (const auto& child : expr.children)
-				variables.merge(GetWriteVariables(child));
-			return variables;
-		}
-	}
-
-	template <typename T, typename Subtract, typename... Args>
-	static std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const Subtract& subtract, const Args&... args) {
-		if constexpr (sizeof...(args) == 0) {
-			std::unordered_set<T> diff = set;
-			for (const auto& sub : subtract)
-				diff.erase(sub);
-			return diff;
-		} else {
-			return SetDifference(SetDifference(set, subtract), args...);
-		}
-	}
-
-	static void ResolveCaptures(Statement& defNode) {
-		std::unordered_set<std::string> writeVars;
-		std::unordered_set<std::string> allVars;
-
-		std::function<void(const std::vector<Statement>&)> scanNode = [&](const std::vector<Statement>& body) {
-			for (const auto& child : body) {
-				bool isFn = child.expr.operation == Operation::Function;
-				switch (child.type) {
-				case Statement::Type::Expr:
-				case Statement::Type::If:
-				case Statement::Type::Elif:
-				case Statement::Type::While:
-				case Statement::Type::Return:
-					if (isFn) {
-						writeVars.insert(child.expr.def.name);
-						allVars.insert(child.expr.def.name);
-						for (const auto& parameter : child.expr.def.parameters) {
-							if (parameter.defaultValue) {
-								writeVars.merge(GetWriteVariables(parameter.defaultValue.value()));
-								allVars.merge(GetReferencedVariables(parameter.defaultValue.value()));
-							}
-						}
-						allVars.insert(child.expr.def.localCaptures.begin(), child.expr.def.localCaptures.end());
-					} else {
-						writeVars.merge(GetWriteVariables(child.expr));
-						allVars.merge(GetReferencedVariables(child.expr));
-					}
-					break;
-				case Statement::Type::Class:
-					writeVars.insert(child.klass.name);
-					allVars.insert(child.klass.name);
-					break;
-				case Statement::Type::Def:
-					writeVars.insert(child.expr.def.name);
-					allVars.insert(child.expr.def.name);
-					break;
-				case Statement::Type::Global:
-					defNode.expr.def.globalCaptures.insert(child.capture.name);
-					break;
-				case Statement::Type::Nonlocal:
-					defNode.expr.def.localCaptures.insert(child.capture.name);
-					break;
-				}
-
-				if (!isFn) {
-					scanNode(child.body);
-				}
-			}
-		};
-
-		scanNode(defNode.expr.def.body);
-
-		std::vector<std::string> parameterVars;
-		for (const auto& param : defNode.expr.def.parameters)
-			parameterVars.push_back(param.name);
-		defNode.expr.def.localCaptures.merge(SetDifference(allVars, writeVars, parameterVars));
-		defNode.expr.def.variables = SetDifference(writeVars, defNode.expr.def.globalCaptures, defNode.expr.def.localCaptures, parameterVars);
-	}
-
-	static CodeError ParseDef(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		out.type = Statement::Type::Def;
-		++p;
-
-		Expression fn{};
-		fn.srcPos = node.tokens[0].srcPos;
-		fn.operation = Operation::Function;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a function name", (--p)->srcPos);
-		} else if (p->type != Token::Type::Word) {
-			return CodeError::Bad("Expected a function name", p->srcPos);
-		}
-		fn.def.name = p->text;
-		++p;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a '('", (--p)->srcPos);
-		} else if (p->text != "(") {
-			return CodeError::Bad("Expected a '('", p->srcPos);
-		}
-		++p;
-
-		if (auto error = ParseParameterList(p, fn.def.parameters)) {
-			return error;
-		}
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ')'", (--p)->srcPos);
-		} else if (p->text != ")") {
-			return CodeError::Bad("Expected a ')'", p->srcPos);
-		}
-		++p;
-
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		if (auto error = ParseBody(node, Statement::Type::Def, fn.def.body)) {
-			return error;
-		}
-
-		out.expr = std::move(fn);
-
-		ResolveCaptures(out);
-
-		return CodeError::Good();
-	}
-
-	static CodeError ParseClass(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		out.type = Statement::Type::Class;
-		++p;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a class name", (--p)->srcPos);
-		} else if (p->type != Token::Type::Word) {
-			return CodeError::Bad("Expected a class name", p->srcPos);
-		}
-		out.klass.name = p->text;
-		++p;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
-		} else if (p->text == "(") {
-			++p;
-			if (auto error = ParseExpressionList(p, ")", out.klass.bases)) {
-				return error;
-			}
-			++p;
-		}
-
-		if (node.children.empty()) {
-			return CodeError::Bad("Expected class body", (--p)->srcPos);
-		}
-
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		for (const auto& method : node.children) {
-			if (method.tokens[0].text == "pass") {
-				continue;
-			} else if (method.tokens[0].text != "def") {
-				return CodeError::Bad("Expected a method definition");
-			}
-
-			Statement stat{};
-			if (auto error = ParseDef(method, stat)) {
-				return error;
-			}
-			stat.srcPos = method.tokens[0].srcPos;
-			out.klass.methodNames.push_back(stat.expr.def.name);
-			out.body.push_back(std::move(stat));
-		}
-
-		return CodeError::Good();
-	}
-
-	static CodeError ParseTry(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		++p;
-
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		out.type = Statement::Type::Try;
-		return ParseBody(node, Statement::Type::Try, out.body);
-	}
-
-	static CodeError ParseExcept(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		++p;
-
-		Expression exceptType{};
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
-		} else if (p->text == ":") {
-			goto end;
-		} else if (auto error = ParseExpression(p, exceptType)) {
-			return error;
-		}
-		out.exceptBlock.exceptType = std::move(exceptType);
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
-		} else if (p->text == ":") {
-			goto end;
-		} else if (p->text != "as") {
-			return CodeError::Bad("Expected a 'as'", p->srcPos);
-		}
-		++p;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected an identifier", (--p)->srcPos);
-		} else if (p->type != Token::Type::Word) {
-			return CodeError::Bad("Expected an identifier", p->srcPos);
-		}
-		out.exceptBlock.var = p->text;
-		++p;
-		
-	end:
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		out.type = Statement::Type::Except;
-		return ParseBody(node, Statement::Type::Except, out.body);
-	}
-
-	static CodeError ParseFinally(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		++p;
-
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		out.type = Statement::Type::Finally;
-		return ParseBody(node, Statement::Type::Finally, out.body);
-	}
-
-	static CodeError ParseRaise(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		++p;
-
-		out.type = Statement::Type::Raise;
-		if (auto error = ParseExpression(p, out.expr)) {
-			return error;
-		} else {
-			return CheckTrailingTokens(p);
-		}
-	}
-
-	static CodeError ParseWith(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		SourcePosition srcPos = p->srcPos;
-		++p;
-
-		Expression manager{};
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
-		} else if (auto error = ParseExpression(p, manager)) {
-			return error;
-		}
-
-		std::string var;
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
-		} else if (p->text == ":") {
-			goto end;
-		} else if (p->text != "as") {
-			return CodeError::Bad("Expected a 'as'", p->srcPos);
-		}
-		++p;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected an identifier", (--p)->srcPos);
-		} else if (p->type != Token::Type::Word) {
-			return CodeError::Bad("Expected an identifier", p->srcPos);
-		}
-		var = p->text;
-		++p;
-
-	end:
-		if (auto error = ExpectColonEnding(p)) {
-			return error;
-		}
-
-		std::vector<Statement> body;
-		if (auto error = ParseBody(node, Statement::Type::Composite, body)) {
-			return error;
-		}
-
-		/*
-		 * __WithMgr = <expr>
-		 * [<var> =] __WithMgr.__enter__()
-		 * try:
-		 *		<body>
-		 * finally:
-		 * 		__WithMgr.__exit__(None, None, None)
-		 */
-
-		std::vector<Statement> mainBody;
-
-		// __WithMgr = <expr>
-		std::string mgrName = "__WithMgr" + std::to_string(Guid());
-		Expression assignMgr{};
-		assignMgr.srcPos = srcPos;
-		assignMgr.operation = Operation::Assign;
-		assignMgr.assignTarget.type = AssignType::Direct;
-		assignMgr.assignTarget.direct = mgrName;
-		assignMgr.children.push_back({}); // Dummy
-		assignMgr.children.push_back(std::move(manager));
-
-		Statement assignMgrStat{};
-		assignMgrStat.srcPos = srcPos;
-		assignMgrStat.type = Statement::Type::Expr;
-		assignMgrStat.expr = std::move(assignMgr);
-		mainBody.push_back(std::move(assignMgrStat));
-
-		// [<var> =] __WithMgr.__enter__()
-		auto loadMgr = [&] {
-			Expression load{};
-			load.srcPos = srcPos;
-			load.operation = Operation::Variable;
-			load.variableName = mgrName;
-			return load;
-		};
-
-		Expression enter{};
-		enter.srcPos = srcPos;
-		enter.operation = Operation::Dot;
-		enter.variableName = "__enter__";
-		enter.children.push_back(loadMgr());
-
-		Expression enterCall{};
-		enterCall.srcPos = srcPos;
-		enterCall.operation = Operation::Call;
-		enterCall.children.push_back(std::move(enter));
-
-		Statement enterStat{};
-		enterStat.srcPos = srcPos;
-		enterStat.type = Statement::Type::Expr;
-		if (!var.empty()) {
-			Expression assign{};
-			assign.srcPos = srcPos;
-			assign.operation = Operation::Assign;
-			assign.assignTarget.type = AssignType::Direct;
-			assign.assignTarget.direct = std::move(var);
-			assign.children.push_back({}); // Dummy
-			assign.children.push_back(std::move(enterCall));
-			enterStat.expr = std::move(assign);
-		} else {
-			enterStat.expr = std::move(enterCall);
-		}
-		mainBody.push_back(std::move(enterStat));
-
-		// __WithMgr.__exit__(None, None, None)
-		Expression loadExit{};
-		loadExit.srcPos = srcPos;
-		loadExit.operation = Operation::Dot;
-		loadExit.variableName = "__exit__";
-		loadExit.children.push_back(loadMgr());
-
-		auto loadNone = [&] {
-			Expression none{};
-			none.srcPos = srcPos;
-			none.operation = Operation::Literal;
-			none.literalValue.type = LiteralValue::Type::Null;
-			return none;
-		};
-		
-		Expression exit{};
-		exit.srcPos = srcPos;
-		exit.operation = Operation::Call;
-		exit.children.push_back(std::move(loadExit));
-		exit.children.push_back(loadNone());
-		exit.children.push_back(loadNone());
-		exit.children.push_back(loadNone());
-
-		Statement exitStat{};
-		exitStat.srcPos = srcPos;
-		exitStat.type = Statement::Type::Expr;
-		exitStat.expr = std::move(exit);
-
-		// try/finally
-		Statement tryBlock{};
-		tryBlock.srcPos = srcPos;
-		tryBlock.type = Statement::Type::Try;
-		tryBlock.body = std::move(body);
-		tryBlock.tryBlock.finallyClause.push_back(std::move(exitStat));
-		mainBody.push_back(std::move(tryBlock));
-
-		// Produce composite statement
-		out.type = Statement::Type::Composite;
-		out.body = std::move(mainBody);
-		return CodeError::Good();
-	}
-
-	static CodeError ParseReturn(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		++p;
-
-		out.type = Statement::Type::Return;
-		if (p.EndReached()) {
-			out.expr.operation = Operation::Literal;
-			out.expr.literalValue.type = LiteralValue::Type::Null;
-			return CodeError::Good();
-		} else if (auto error = ParseExpression(p, out.expr)) {
-			return error;
-		} else {
-			return CheckTrailingTokens(p);
-		}
-	}
-
-	static CodeError ParseSingleToken(const LexTree& node, Statement& out, Statement::Type type) {
-		TokenIter p(node.tokens);
-		++p;
-		out.type = type;
-		return CheckTrailingTokens(p);
-	}
-
-	static CodeError CheckBreakable(const LexTree& node) {
-		auto it = statementHierarchy.rbegin();
-		while (true) {
-			if (*it == Statement::Type::Def || *it == Statement::Type::Root) {
-				return CodeError::Bad("'break' or 'continue' outside of loop", node.tokens[0].srcPos);
-			} else if (*it == Statement::Type::For || *it == Statement::Type::While) {
-				return CodeError::Good();
-			}
-			++it;
-		}
-	}
-
-	static CodeError ParseBreak(const LexTree& node, Statement& out) {
-		if (auto error = CheckBreakable(node)) {
-			return error;
-		}
-		return ParseSingleToken(node, out, Statement::Type::Break);
-	}
-
-	static CodeError ParseContinue(const LexTree& node, Statement& out) {
-		if (auto error = CheckBreakable(node)) {
-			return error;
-		}
-		return ParseSingleToken(node, out, Statement::Type::Continue);
-	}
-
-	static CodeError ParsePass(const LexTree& node, Statement& out) {
-		return ParseSingleToken(node, out, Statement::Type::Pass);
-	}
-
-	static CodeError ParseCapture(const LexTree& node, Statement& out, Statement::Type type) {
-		TokenIter p(node.tokens);
-		++p;
-
-		if (statementHierarchy.back() == Statement::Type::Root) {
-			return CodeError::Bad("Cannot capture at top level", (--p)->srcPos);
-		}
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
-		} else if (p->type != Token::Type::Word) {
-			return CodeError::Bad("Expected a variable name", p->srcPos);
-		}
-
-		out.type = type;
-		out.capture.name = p->text;
-		++p;
-		return CheckTrailingTokens(p);
-	}
-
-	static CodeError ParseNonlocal(const LexTree& node, Statement& out) {
-		return ParseCapture(node, out, Statement::Type::Nonlocal);
-	}
-
-	static CodeError ParseGlobal(const LexTree& node, Statement& out) {
-		return ParseCapture(node, out, Statement::Type::Global);
-	}
-
-	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		out.type = Statement::Type::Expr;
-		if (auto error = ParseExpression(p, out.expr)) {
-			return error;
-		} else {
-			return CheckTrailingTokens(p);
-		}
-	}
-
-	static CodeError ParseImportFrom(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		out.type = Statement::Type::ImportFrom;
-		++p;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a module name", (--p)->srcPos);
-		} else if (p->type != Token::Type::Word) {
-			return CodeError::Bad("Expected a module name", p->srcPos);
-		}
-
-		out.importFrom.module = p->text;
-		++p;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected 'import'", (--p)->srcPos);
-		} else if (p->text != "import") {
-			return CodeError::Bad("Expected 'import'", p->srcPos);
-		}
-		++p;
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a name", (--p)->srcPos);
-		}
-		
-		if (p->text == "*") {
-			++p;
-		} else {
-			while (true) {
-				if (p->type != Token::Type::Word) {
-					return CodeError::Bad("Expected a name", p->srcPos);
-				}
-				out.importFrom.names.push_back(p->text);
-				++p;
-
-				if (p.EndReached()) {
-					break;
-				}
-
-				if (p->text == "as") {
-					++p;
-					if (p.EndReached()) {
-						return CodeError::Bad("Expected a name", (--p)->srcPos);
-					} else if (p->type != Token::Type::Word) {
-						return CodeError::Bad("Expected a name", p->srcPos);
-					}
-					out.importFrom.alias = p->text;
-					++p;
-					break;
-				}
-				
-				if (p->text == ",") {
-					++p;
-				} else {
-					return CodeError::Bad("Expected ','", p->srcPos);
-				}
-			}
-		}
-
-		return CheckTrailingTokens(p);
-	}
-
-	static CodeError ParseImport(const LexTree& node, Statement& out) {
-		TokenIter p(node.tokens);
-		out.type = Statement::Type::Import;
-		++p;
-		
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a module name", (--p)->srcPos);
-		} else if (p->type != Token::Type::Word) {
-			return CodeError::Bad("Expected a module name", p->srcPos);
-		}
-
-		out.import.module = p->text;
-		++p;
-
-		if (!p.EndReached() && p->text == "as") {
-			++p;
-			if (p.EndReached()) {
-				return CodeError::Bad("Expected an alias name", (--p)->srcPos);
-			} else if (p->type != Token::Type::Word) {
-				return CodeError::Bad("Expected an alias name", p->srcPos);
-			}
-			out.import.alias = p->text;
-			++p;
-		}
-		
-		return CheckTrailingTokens(p);
-	}
-
-	using ParseFn = CodeError(*)(const LexTree& node, Statement& out);
-
-	static const std::unordered_map<std::string, ParseFn> STATEMENT_STARTINGS = {
-		{ "if", ParseIf },
-		{ "elif", ParseElif },
-		{ "else", ParseElse },
-		{ "while", ParseWhile },
-		{ "for", ParseFor },
-		{ "break", ParseBreak },
-		{ "continue", ParseContinue },
-		{ "def", ParseDef },
-		{ "class", ParseClass },
-		{ "return", ParseReturn },
-		{ "pass", ParsePass },
-		{ "nonlocal", ParseNonlocal },
-		{ "global", ParseGlobal },
-		{ "try", ParseTry },
-		{ "except", ParseExcept },
-		{ "finally", ParseFinally },
-		{ "raise", ParseRaise },
-		{ "with", ParseWith },
-		{ "from", ParseImportFrom },
-		{ "import", ParseImport },
-	};
-
-	static CodeError ParseStatement(const LexTree& node, Statement& out) {
-		const auto& firstToken = node.tokens[0].text;
-		if (STATEMENT_STARTINGS.contains(firstToken)) {
-			if (auto error = STATEMENT_STARTINGS.at(firstToken)(node, out)) {
-				return error;
-			}
-		} else {
-			if (auto error = ParseExpressionStatement(node, out)) {
-				return error;
-			}
-		}
-
-		out.srcPos = node.tokens[0].srcPos;
-		return CodeError::Good();
-	}
-
-	void ExpandCompositeStatements(std::vector<Statement>& statements) {
-		for (size_t i = 0; i < statements.size(); i++) {
-			if (statements[i].type == Statement::Type::Composite) {
-				for (size_t j = 0; j < statements[i].body.size(); j++) {
-					auto& child = statements[i].body[j];
-					statements.insert(statements.begin() + i + j + 1, std::move(child));
-				}
-				statements.erase(statements.begin() + i);
-			}
-		}
-	}
-
-	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out) {
-		out.clear();
-
-		if (node.children.empty()) {
-			return CodeError::Bad("Expected a statement", node.tokens.back().srcPos);
-		}
-
-		statementHierarchy.push_back(statType);
-		for (auto& node : node.children) {
-			Statement statement;
-			if (auto error = ParseStatement(node, statement)) {
-				out.clear();
-				return error;
-			}
-			out.push_back(std::move(statement));
-		}
-		statementHierarchy.pop_back();
-
-		ExpandCompositeStatements(out);
-
-		// Validate elif and else
-		for (size_t i = 0; i < out.size(); i++) {
-			auto& stat = out[i];
-			Statement::Type lastType = i ? out[i - 1].type : Statement::Type::Pass;
-
-			if (stat.type == Statement::Type::Elif) {
-				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif) {
-					return CodeError::Bad(
-						"An 'elif' clause may only appear after an 'if' or 'elif' clause",
-						stat.srcPos
-					);
-				}
-			} else if (stat.type == Statement::Type::Else) {
-				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif && lastType != Statement::Type::While) {
-					return CodeError::Bad(
-						"An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause",
-						stat.srcPos
-					);
-				}
-			}
-		}
-
-		// Rearrange elif and else nodes
-		for (size_t i = 0; i < out.size(); i++) {
-			auto& stat = out[i];
-
-			std::optional<Statement> elseClause;
-			if (stat.type == Statement::Type::Elif) {
-				// Transform elif into an else and if statement
-				stat.type = Statement::Type::If;
-				elseClause = Statement{};
-				elseClause.value().srcPos = stat.srcPos;
-				elseClause.value().type = Statement::Type::Else;
-				elseClause.value().body.push_back(std::move(stat));
-				out.erase(out.begin() + i);
-				i--;
-
-			} else if (stat.type == Statement::Type::Else) {
-				elseClause = std::move(stat);
-				out.erase(out.begin() + i);
-				i--;
-			}
-
-			if (elseClause) {
-				Statement* parent = &out[i];
-				while (parent->elseClause) {
-					parent = &parent->elseClause->body.back();
-				}
-				parent->elseClause = std::make_unique<Statement>(std::move(elseClause.value()));
-			}
-		}
-
-		for (size_t i = 0; i < out.size(); i++) {
-			SourcePosition srcPos = out[i].srcPos;
-			switch (out[i].type) {
-			case Statement::Type::Except:
-				return CodeError::Bad("An 'except' clause may only appear after a 'try' or 'except' clause", srcPos);
-			case Statement::Type::Finally:
-				return CodeError::Bad("A 'finally' clause may only appear after a 'try' or 'except' clause", srcPos);
-			case Statement::Type::Try: {
-				auto& tryStat = out[i];
-				
-				for (i++; i < out.size(); i++) {
-					srcPos = out[i].srcPos;
-					switch (out[i].type) {
-					case Statement::Type::Except: {
-						auto& exceptClauses = tryStat.tryBlock.exceptClauses;
-						if (!exceptClauses.empty() && !exceptClauses.back().exceptBlock.exceptType.has_value()) {
-							return CodeError::Bad("Default 'except' clause must be last", srcPos);
-						}
-						exceptClauses.push_back(std::move(out[i]));
-						out.erase(out.begin() + i);
-						i--;
-						break;
-					}
-					case Statement::Type::Finally:
-						tryStat.tryBlock.finallyClause = std::move(out[i].body);
-						out.erase(out.begin() + i);
-						i--;
-						goto end;
-					default:
-						goto end;
-					}
-				}
-
-			end:
-				if (tryStat.tryBlock.exceptClauses.empty() && tryStat.tryBlock.finallyClause.empty()) {
-					return CodeError::Bad("Expected an 'except' or 'finally' clause", srcPos);
-				}
-				i--;
-			}
-			}
-		}
-
-		return CodeError::Good();
-	}
-
-	ParseResult Parse(const LexTree& lexTree) {
-		ParseResult result{};
-		result.parseTree.type = Statement::Type::Root;
-
-		if (lexTree.children.empty()) {
-			return result;
-		}
-
-		statementHierarchy.clear();
-		result.error = ParseBody(lexTree, Statement::Type::Root, result.parseTree.expr.def.body);
-		statementHierarchy.clear();
-
-		ResolveCaptures(result.parseTree);
-		result.parseTree.expr.def.variables.merge(result.parseTree.expr.def.localCaptures);
-		result.parseTree.expr.def.localCaptures.clear();
-
-		return result;
-	}
-}
-
-
-#include <regex>
-#include <optional>
-#include <stack>
-
-namespace wings {
-
-	std::string Token::ToString() const {
-		std::vector<std::pair<std::string, std::string>> props;
-
-		props.push_back({ "text", '"' + text + '"' });
-		props.push_back({ "srcPos", '(' + std::to_string(srcPos.line + 1)
-								  + ',' + std::to_string(srcPos.column + 1) + ')' });
-		switch (type) {
-		case Token::Type::Null:
-			props.push_back({ "type", "null" });
-			break;
-		case Token::Type::Bool:
-			props.push_back({ "type", "bool" });
-			props.push_back({ "value", literal.b ? "True" : "False" });
-			break;
-		case Token::Type::Int:
-			props.push_back({ "type", "int" });
-			props.push_back({ "value", std::to_string(literal.i) });
-			break;
-		case Token::Type::Float:
-			props.push_back({ "type", "float" });
-			props.push_back({ "value", std::to_string(literal.f) });
-			break;
-		case Token::Type::String:
-			props.push_back({ "type", "string" });
-			props.push_back({ "value", literal.s });
-			break;
-		case Token::Type::Symbol:
-			props.push_back({ "type", "symbol" });
-			break;
-		case Token::Type::Word:
-			props.push_back({ "type", "word" });
-			break;
-		default:
-			WG_UNREACHABLE();
-		}
-
-		std::string s = "{ ";
-		for (const auto& p : props)
-			s += p.first + ": " + p.second + ", ";
-		return s + "}";
-	}
-
-	static const std::vector<std::string> SYMBOLS = {
-		"(", ")", "[", "]", "{", "}", ":", ".", ",",
-		"+", "-", "*", "**", "/", "//", "%",
-		"<", ">", "<=", ">=", "==", "!=",
-		"!", "&&", "||", "^", "&", "|", "~", "<<", ">>",
-		"=", ":=",
-		"+=", "-=", "*=", "**=", "%=", "/=", "//=",
-		">>=", "<<=", "|=", "&=", "^=", ";", "--", "++"
-	};
-
-	static std::string NormalizeLineEndings(const std::string& text) {
-		auto s = std::regex_replace(text, std::regex("\r\n"), "\n");
-		std::replace(s.begin(), s.end(), '\r', '\n');
-		return s;
-	}
-
-	static bool IsAlpha(char c) {
-		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
-	}
-
-	static bool IsDigit(char c, int base = 10) {
-		switch (base) {
-		case 2: return c >= '0' && c <= '1';
-		case 8: return c >= '0' && c <= '7';
-		case 10: return c >= '0' && c <= '9';
-		case 16: return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-		default: WG_UNREACHABLE();
-		}
-	}
-
-	static int DigitValueOf(char c, int base) {
-		switch (base) {
-		case 2:
-		case 8:
-		case 10:
-			return c - '0';
-		case 16:
-			if (c >= '0' && c <= '9') {
-				return c - '0';
-			} else if (c >= 'a' && c <= 'f') {
-				return c - 'a' + 10;
-			} else {
-				return c - 'A' + 10;
-			}
-		default:
-			WG_UNREACHABLE();
-		}
-	}
-
-	static bool IsAlphaNum(char c) {
-		return IsAlpha(c) || IsDigit(c);
-	}
-
-	static bool IsWhitespace(const std::string& s) {
-		return s.find_first_not_of(" \t") == std::string::npos;
-	}
-
-	static bool IsWhitespaceChar(char c) {
-		return c == ' ' || c == '\t';
-	}
-
-	static void StripComments(std::string& s) {
-		s.erase(
-			std::find(s.begin(), s.end(), '#'),
-			s.end()
-		);
-	}
-
-	static bool IsPossibleSymbol(const std::string& s) {
-		return std::any_of(SYMBOLS.begin(), SYMBOLS.end(), [&](const auto& x) { return x.starts_with(s); });
-	}
-
-	static bool IsPossibleSymbol(char c) {
-		return IsPossibleSymbol(std::string(1, c));
-	}
-
-	static std::vector<std::string> SplitLines(const std::string& s) {
-		std::vector<std::string> v;
-		size_t last = 0;
-		size_t next = 0;
-		while ((next = s.find('\n', last)) != std::string::npos) {
-			v.push_back(s.substr(last, next - last));
-			last = next + 1;
-		}
-		v.push_back(s.substr(last));
-		return v;
-	}
-
-	static int IndentOf(const std::string& line, std::optional<std::string>& indentString, size_t& indent) {
-		size_t i = 0;
-		while (true) {
-			// Reached end of line or comment before any code
-			if (i >= line.size() || line[i] == '#') {
-				indent = 0;
-				return 0;
-			}
-
-			// Reached code
-			if (line[i] != ' ' && line[i] != '\t')
-				break;
-
-			i++;
-		}
-
-		if (i == 0) {
-			// No indent
-			indent = 0;
-			return 0;
-		} else {
-			// Make sure indent is either all spaces or all tabs
-			if (!std::all_of(line.begin(), line.begin() + i, [&](char c) { return c == line[0]; })) {
-				return -1;
-			}
-
-			if (!indentString.has_value()) {
-				// Encountered first indent
-				indentString = line.substr(0, i);
-				indent = 1;
-				return 0;
-			} else {
-				// Make sure indent is consistent with previous indents
-				if (i % indentString.value().size()) {
-					return -1;
-				}
-
-				indent = i / indentString.value().size();
-				return 0;
-			}
-		}
-	}
-
-	using StringIter = const char*;
-
-	static Token ConsumeWord(StringIter& p) {
-		Token t{};
-		for (; *p && IsAlphaNum(*p); ++p) {
-			t.text += *p;
-		}
-		t.type = Token::Type::Word;
-		if (t.text == "None") {
-			t.type = Token::Type::Null;
-		} else if (t.text == "True" || t.text == "False") {
-			t.type = Token::Type::Bool;
-			t.literal.b = t.text[0] == 'T';
-		} else if (IsKeyword(t.text)) {
-			t.type = Token::Type::Keyword;
-		}
-		return t;
-	}
-
-	static CodeError ConsumeNumber(StringIter& p, Token& out) {
-		StringIter start = p;
-
-		Token t{};
-		int base = 10;
-		if (*p == '0') {
-			switch (p[1]) {
-			case 'b': case 'B': base = 2; break;
-			case 'o': case 'O': base = 8; break;
-			case 'x': case 'X': base = 16; break;
-			}
-		}
-
-		if (base != 10) {
-			t.text += p[0];
-			t.text += p[1];
-			p += 2;
-
-			if (!IsDigit(*p, base) && *p != '.') {
-				switch (base) {
-				case 2: return CodeError::Bad("Invalid binary string");
-				case 8: return CodeError::Bad("Invalid octal string");
-				case 16: return CodeError::Bad("Invalid hexadecimal string");
-				default: WG_UNREACHABLE();
-				}
-			}
-		}
-
-		uintmax_t value = 0;
-		for (; *p && IsDigit(*p, base); ++p) {
-			value = (base * value) + DigitValueOf(*p, base);
-		}
-
-		if (*p == '.') {
-			// Is a float
-			++p;
-			Wg_float fvalue = (Wg_float)value;
-			for (int i = 1; *p && IsDigit(*p, base); ++p, ++i) {
-				fvalue += DigitValueOf(*p, base) * std::pow((Wg_float)base, (Wg_float)-i);
-			}
-			t.literal.f = fvalue;
-			t.type = Token::Type::Float;
-		} else {
-			// Is an int
-			if (value > std::numeric_limits<Wg_uint>::max()) {
-				return CodeError::Bad("Integer literal is too large");
-			}
-			Wg_uint u = (Wg_uint)value;
-			static_assert(sizeof(t.literal.i) == sizeof(u));
-			std::memcpy(&t.literal.i, &u, sizeof(u));
-			t.type = Token::Type::Int;
-		}
-
-		if (IsAlphaNum(*p)) {
-			return CodeError::Bad("Invalid numerical literal");
-		}
-
-		t.text = std::string(start, p);
-		out = std::move(t);
-		return CodeError::Good();
-	}
-
-	static bool IsHexDigit(char c, int& val) {
-		if (c >= '0' && c <= '9') {
-			val = c - '0';
-			return true;
-		} else if (c >= 'a' && c <= 'f') {
-			val = c - 'a' + 10;
-			return true;
-		} else if (c >= 'A' && c <= 'F') {
-			val = c - 'A' + 10;
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	static CodeError ConsumeString(StringIter& p, Token& out) {
-		char quote = *p;
-		++p;
-
-		Token t{};
-		for (; *p && *p != quote; ++p) {
-			t.text += *p;
-
-			// Escape sequences
-			if (*p == '\\') {
-				++p;
-				if (*p == '\0') {
-					return CodeError::Bad("Missing closing quote");
-				}
-
-				if (*p == 'x') {
-					++p;
-					int	d1 = 0;
-					if (!IsHexDigit(*p, d1)) {
-						return CodeError::Bad("Invalid hex escape sequence");
-					}
-					t.text += *p;
-					
-					++p;
-					int d2 = 0;
-					if (!IsHexDigit(*p, d2)) {
-						return CodeError::Bad("Invalid hex escape sequence");
-					}
-					t.text += *p;
-					
-					t.literal.s += (char)((d1 << 4) | d2);
-				} else {
-					char esc = 0;
-					switch (*p) {
-					case '0': esc = '\0'; break;
-					case 'n': esc = '\n'; break;
-					case 'r': esc = '\r'; break;
-					case 't': esc = '\t'; break;
-					case 'v': esc = '\v'; break;
-					case 'b': esc = '\b'; break;
-					case 'f': esc = '\f'; break;
-					case '"': esc = '"'; break;
-					case '\'': esc = '\''; break;
-					case '\\': esc = '\\'; break;
-					default: return CodeError::Bad("Invalid escape sequence");
-					}
-					t.text += *p;
-					t.literal.s += esc;
-				}
-			} else {
-				t.literal.s += *p;
-			}
-		}
-
-		if (*p == '\0') {
-			return CodeError::Bad("Missing closing quote");
-		}
-
-		// Skip closing quote
-		++p;
-
-		t.text = quote + t.text + quote;
-		t.type = Token::Type::String;
-		out = std::move(t);
-		return CodeError::Good();
-	}
-
-	static void ConsumeWhitespace(StringIter& p) {
-		while (*p && IsWhitespaceChar(*p))
-			++p;
-	}
-
-	static CodeError ConsumeSymbol(StringIter& p, Token& t) {
-		for (; *p && IsPossibleSymbol(t.text + *p); ++p) {
-			t.text += *p;
-		}
-		t.type = Token::Type::Symbol;
-
-		if (std::find(SYMBOLS.begin(), SYMBOLS.end(), t.text) == SYMBOLS.end()) {
-			return CodeError::Bad("Unrecognised symbol " + t.text);
-		} else {
-			return CodeError::Good();
-		}
-	}
-
-	static CodeError TokenizeLine(const std::string& line, std::vector<Token>& out) {
-		std::vector<Token> tokens;
-		CodeError error = CodeError::Good();
-
-		StringIter p = line.data();
-		while (*p) {
-			size_t srcColumn = p - line.data();
-			bool wasWhitespace = false;
-
-			if (IsAlpha(*p)) {
-				tokens.push_back(ConsumeWord(p));
-			} else if (IsDigit(*p)) {
-				Token t{};
-				if (!(error = ConsumeNumber(p, t))) {
-					tokens.push_back(std::move(t));
-				}
-			} else if (*p == '\'' || *p == '"') {
-				Token t{};
-				if (!(error = ConsumeString(p, t))) {
-					tokens.push_back(std::move(t));
-				}
-			} else if (IsPossibleSymbol(*p)) {
-				Token t{};
-				if (!(error = ConsumeSymbol(p, t))) {
-					tokens.push_back(std::move(t));
-				}
-			} else if (IsWhitespaceChar(*p)) {
-				ConsumeWhitespace(p);
-				wasWhitespace = true;
-			} else {
-				error.good = false;
-				error.srcPos.column = srcColumn;
-				error.message = std::string("Unrecognised character ") + *p;
-			}
-
-			if (error) {
-				out.clear();
-				error.srcPos.column = srcColumn;
-				return error;
-			}
-
-			if (!wasWhitespace) {
-				tokens.back().srcPos.column = srcColumn;
-			}
-		}
-
-		out = std::move(tokens);
-		return CodeError::Good();
-	}
-
-	// Returns [no. of open brackets] minus [no. close brackets]
-	static int BracketBalance(std::vector<Token>& tokens) {
-		int balance = 0;
-		for (const auto& t : tokens) {
-			if (t.text.size() == 1) {
-				switch (t.text[0]) {
-				case '(': case '[': case '{': balance++; break;
-				case ')': case ']': case '}': balance--; break;
-				}
-			}
-		}
-		return balance;
-	}
-
-	LexResult Lex(std::string code) {
-		code = NormalizeLineEndings(code);
-		auto originalSource = SplitLines(code);
-
-		std::vector<std::string> lines = originalSource;
-		for (auto& line : lines)
-			StripComments(line);
-
-		CodeError error = CodeError::Good();
-		std::optional<std::string> indentString;
-		int bracketBalance = 0;
-
-		LexTree rootTree;
-		std::stack<LexTree*> parents;
-		parents.push(&rootTree);
-
-		for (size_t i = 0; i < lines.size(); i++) {
-			if (IsWhitespace(lines[i]))
-				continue;
-
-			std::vector<Token> tokens;
-			if (error = TokenizeLine(lines[i], tokens)) {
-				// Line had tokenizing errors
-				error.srcPos.line = i;
-				break;
-			} else {
-				// Assign line numbers
-				for (auto& token : tokens) {
-					token.srcPos.line = i;
-				}
-			}
-
-			bool continuePrevLine = bracketBalance > 0;
-			bracketBalance = std::max(0, bracketBalance + BracketBalance(tokens));
-			if (continuePrevLine) {
-				// Ignore indenting and continue as previous line
-				auto& prevLineTokens = parents.top()->children.back().tokens;
-				prevLineTokens.insert(prevLineTokens.end(), tokens.begin(), tokens.end());
-				continue;
-			}
-
-			// Get indentation level
-			size_t parentIndent = parents.size() - 1;
-			size_t currentIndent = 0;
-			if (IndentOf(lines[i], indentString, currentIndent)) {
-				error = CodeError::Bad("Invalid indentation", { i, 0 });
-				break;
-			}
-
-			if (currentIndent > parentIndent + 1) {
-				// Indented too much
-				error = CodeError::Bad("Indentation level increased by more than 1", { i, 0 });
-				break;
-			} else if (currentIndent == parentIndent + 1) {
-				// Indented
-				// Make the last child the new parent
-				if (parents.top()->children.empty()) {
-					error = CodeError::Bad("Indentation not expected", { i, 0 });
-					break;
-				}
-				parents.push(&parents.top()->children.back());
-			} else if (currentIndent < parentIndent) {
-				// De-indented
-				for (size_t j = 0; j < parentIndent - currentIndent; j++)
-					parents.pop();
-			}
-
-			parents.top()->children.push_back(LexTree{ std::move(tokens), {} });
-		}
-
-		LexResult result{};
-		result.error = std::move(error);
-		result.lexTree = std::move(rootTree);
-		result.originalSource = std::move(originalSource);
-		return result;
-	}
-}
-
-
-namespace wings {
-	bool ImportMath(Wg_Context* context);
-}
-
-
-namespace wings {
-	bool ImportOS(Wg_Context* context);
-}
-
-
-namespace wings {
-	bool ImportRandom(Wg_Context* context);
-}
-
-
-namespace wings {
-	bool ImportSys(Wg_Context* context);
-}
-
-
-
-#include <iostream>
-#include <memory>
-#include <fstream>
-#include <vector>
-#include <string>
-#include <string_view>
-#include <sstream>
-#include <queue>
-#include <unordered_set>
-#include <cstring>
-
-namespace wings {
-	static bool ReadFromFile(const std::string& path, std::string& data) {
-		std::ifstream f(path);
-		if (!f.is_open())
-			return false;
-
-		std::stringstream buffer;
-		buffer << f.rdbuf();
-
-		if (!f)
-			return false;
-
-		data = buffer.str();
-		return true;
-	}
-
-	static bool LoadFileModule(Wg_Context* context, const std::string& module) {
-		std::string path = context->importPath + module + ".py";
-		std::string source;
-		if (!ReadFromFile(path, source)) {
-			std::string msg = std::string("No module named '") + module + "'";
-			Wg_RaiseException(context, WG_EXC_IMPORTERROR, msg.c_str());
-			return false;
-		}
-
-		Wg_Obj* fn = Compile(context, source.c_str(), module.c_str(), module.c_str(), false);
-		if (fn == nullptr)
-			return false;
-
-		return Wg_Call(fn, nullptr, 0) != nullptr;
-	}
-
-	static bool LoadModule(Wg_Context* context, const std::string& name) {
-		if (!context->globals.contains(name)) {
-			bool success{};
-			context->globals.insert({ std::string(name), {} });
-			context->currentModule.push(name);
-
-			if (name != "__builtins__")
-				Wg_ImportAllFromModule(context, "__builtins__");
-
-			auto it = context->moduleLoaders.find(name);
-			if (it != context->moduleLoaders.end()) {
-				success = it->second(context);
-			} else {
-				success = LoadFileModule(context, name);
-			}
-
-			context->currentModule.pop();
-			if (!success) {
-				context->globals.erase(name);
-				return false;
-			}
-		}
-		return true;
-	}
-}
-
-extern "C" {
-	void Wg_DefaultConfig(Wg_Config* config) {
-		WG_ASSERT_VOID(config);
-		config->maxAlloc = 1'000'000;
-		config->maxRecursion = 50;
-		config->gcRunFactor = 2.0f;
-		config->printUserdata = nullptr;
-		config->argv = nullptr;
-		config->argc = 0;
-		config->enableOSAccess = false;
-		config->print = [](const char* message, int len, void*) {
-			std::cout << std::string_view(message, (size_t)len);
-		};
-	}
-
-	Wg_Context* Wg_CreateContext(const Wg_Config* config) {
-		Wg_Context* context = new Wg_Context();
-		
-		context->currentModule.push("__main__");
-		context->globals.insert({ std::string("__main__"), {} });
-
-		// Initialise the library without restriction
-		Wg_DefaultConfig(&context->config);
-		
-		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
-		Wg_RegisterModule(context, "dis", wings::ImportDis);
-		Wg_RegisterModule(context, "math", wings::ImportMath);
-		Wg_RegisterModule(context, "random", wings::ImportRandom);
-		Wg_RegisterModule(context, "sys", wings::ImportSys);
-		Wg_RegisterModule(context, "time", wings::ImportTime);
-		Wg_ImportAllFromModule(context, "__builtins__");
-		
-		if (config) {
-			WG_ASSERT(context);
-			WG_ASSERT(config->maxAlloc >= 0);
-			WG_ASSERT(config->maxRecursion >= 0);
-			WG_ASSERT(config->gcRunFactor >= 1.0f);
-			WG_ASSERT(config->argc >= 0);
-			if (config->argc) {
-				WG_ASSERT(config->argv);
-				for (int i = 0; i < config->argc; i++)
-					WG_ASSERT(config->argv[i]);
-			}
-
-			if (config->importPath) {
-				context->importPath = config->importPath;
-				if (config->importPath[0] != '/' && config->importPath[0] != '\\')
-					context->importPath += "/";
-			}
-
-			context->config = *config;
-		}
-		
-		if (context->config.enableOSAccess) {
-			Wg_RegisterModule(context, "os", wings::ImportOS);
-		}
-		
-		if (!wings::InitArgv(context, context->config.argv, context->config.argc))
-			return nullptr;
-		
-		return context;
-	}
-
-	void Wg_DestroyContext(Wg_Context* context) {
-		WG_ASSERT_VOID(context);
-		context->closing = true;
-		Wg_CollectGarbage(context);
-		delete context;
-	}
-
-	void Wg_Print(const Wg_Context* context, const char* message, int len) {
-		WG_ASSERT_VOID(context && message);
-		if (context->config.print) {
-			context->config.print(len ? message : "", len, context->config.printUserdata);
-		}
-	}
-
-	void Wg_PrintString(const Wg_Context* context, const char* message) {
-		WG_ASSERT_VOID(context && message);
-		Wg_Print(context, message, (int)std::strlen(message));
-	}
-
-	void Wg_SetErrorCallback(Wg_ErrorCallback callback) {
-		wings::errorCallback = callback;
-	}
-
-	Wg_Obj* Wg_Compile(Wg_Context* context, const char* script, const char* prettyName) {
-		return wings::Compile(context, script, "__main__", prettyName, false);
-	}
-
-	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* script, const char* prettyName) {
-		return wings::Compile(context, script, "__main__", prettyName, true);
-	}
-
-	bool Wg_Execute(Wg_Context* context, const char* script, const char* prettyName) {
-		if (Wg_Obj* fn = Wg_Compile(context, script, prettyName)) {
-			return Wg_Call(fn, nullptr, 0) != nullptr;
-		}
-		return false;
-	}
-	
-	Wg_Obj* Wg_ExecuteExpression(Wg_Context* context, const char* script, const char* prettyName) {
-		if (Wg_Obj* fn = Wg_CompileExpression(context, script, prettyName)) {
-			return Wg_Call(fn, nullptr, 0);
-		}
-		return nullptr;
-	}
-
-	Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
-		WG_ASSERT(context && name && wings::IsValidIdentifier(name));
-		auto module = std::string(context->currentModule.top());
-		auto& globals = context->globals.at(module);
-		auto it = globals.find(name);
-		if (it == globals.end()) {
-			return nullptr;
-		} else {
-			return *it->second;
-		}
-	}
-
-	void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value) {
-		WG_ASSERT_VOID(context && name && value && wings::IsValidIdentifier(name));
-		const auto& module = std::string(context->currentModule.top());
-		auto& globals = context->globals.at(module);
-		auto it = globals.find(name);
-		if (it != globals.end()) {
-			*it->second = value;
-		} else {
-			globals.insert({ std::string(name), wings::MakeRcPtr<Wg_Obj*>(value) });
-		}
-	}
-
-	void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
-		WG_ASSERT_VOID(context && name && loader && wings::IsValidIdentifier(name));
-		context->moduleLoaders.insert({ std::string(name), loader });
-	}
-
-	Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* module, const char* alias) {
-		WG_ASSERT(context && module && wings::IsValidIdentifier(module));
-		if (alias) {
-			WG_ASSERT(wings::IsValidIdentifier(alias));
-		} else {
-			alias = module;
-		}
-
-		if (!wings::LoadModule(context, module))
-			return nullptr;
-
-		Wg_Obj* moduleObject = Wg_Call(context->builtins.moduleObject, nullptr, 0);
-		if (moduleObject == nullptr)
-			return nullptr;
-		auto& mod = context->globals.at(module);
-		for (auto& [var, val] : mod) {
-			Wg_SetAttribute(moduleObject, var.c_str(), *val);
-		}
-		Wg_SetGlobal(context, alias, moduleObject);
-		return moduleObject;
-	}
-
-	Wg_Obj* Wg_ImportFromModule(Wg_Context* context, const char* module, const char* name, const char* alias) {
-		WG_ASSERT(context && module && name && wings::IsValidIdentifier(module));
-		if (alias) {
-			WG_ASSERT(wings::IsValidIdentifier(alias));
-		} else {
-			alias = name;
-		}
-
-		if (!wings::LoadModule(context, module))
-			return nullptr;
-
-		auto& mod = context->globals.at(module);
-		auto it = mod.find(name);
-		if (it == mod.end()) {
-			std::string msg = std::string("Cannot import '") + name
-				+ "' from '" + module + "'";
-			Wg_RaiseException(context, WG_EXC_IMPORTERROR, msg.c_str());
-			return nullptr;
-		}
-
-		Wg_SetGlobal(context, alias, *it->second);
-		return *it->second;
-	}
-
-	bool Wg_ImportAllFromModule(Wg_Context* context, const char* module) {
-		WG_ASSERT(context && module && wings::IsValidIdentifier(module));
-
-		if (!wings::LoadModule(context, module))
-			return false;
-
-		auto& mod = context->globals.at(module);
-		for (auto& [var, val] : mod) {
-			Wg_SetGlobal(context, var.c_str(), *val);
-		}
-		return true;
-	}
-
-	Wg_Obj* Wg_None(Wg_Context* context) {
-		WG_ASSERT(context);
-		return context->builtins.none;
-	}
-
-	Wg_Obj* Wg_NewBool(Wg_Context* context, bool value) {
-		WG_ASSERT(context);
-		if (value && context->builtins._true) {
-			return context->builtins._true;
-		} else if (!value && context->builtins._false) {
-			return context->builtins._false;
-		} else {
-			return value ? context->builtins._true : context->builtins._false;
-		}
-	}
-
-	Wg_Obj* Wg_NewInt(Wg_Context* context, Wg_int value) {
-		WG_ASSERT(context);
-		if (Wg_Obj* v = Wg_Call(context->builtins._int, nullptr, 0)) {
-			v->Get<Wg_int>() = value;
-			return v;
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_NewFloat(Wg_Context* context, Wg_float value) {
-		WG_ASSERT(context);
-		if (Wg_Obj* v = Wg_Call(context->builtins._float, nullptr, 0)) {
-			v->Get<Wg_float>() = value;
-			return v;
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_NewString(Wg_Context* context, const char* value) {
-		WG_ASSERT(context);
-		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
-			v->Get<std::string>() = value ? value : "";
-			return v;
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_NewStringBuffer(Wg_Context* context, const char* buffer, int length) {
-		WG_ASSERT(context && buffer && length >= 0);
-		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
-			v->Get<std::string>() = std::string(buffer, length);
-			return v;
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_NewTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
-		std::vector<wings::Wg_ObjRef> refs;
-		WG_ASSERT(context && argc >= 0);
-		if (argc > 0) {
-			WG_ASSERT(argv);
-			for (int i = 0; i < argc; i++) {
-				refs.emplace_back(argv[i]);
-				WG_ASSERT(argv[i]);
-			}
-		}
-
-		if (Wg_Obj* v = Wg_Call(context->builtins.tuple, nullptr, 0)) {
-			v->Get<std::vector<Wg_Obj*>>() = std::vector<Wg_Obj*>(argv, argv + argc);
-			return v;
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_NewList(Wg_Context* context, Wg_Obj** argv, int argc) {
-		std::vector<wings::Wg_ObjRef> refs;
-		WG_ASSERT(context && argc >= 0);
-		if (argc > 0) {
-			WG_ASSERT(argv);
-			for (int i = 0; i < argc; i++) {
-				refs.emplace_back(argv[i]);
-				WG_ASSERT(argv[i]);
-			}
-		}
-
-		if (Wg_Obj* v = Wg_Call(context->builtins.list, nullptr, 0)) {
-			v->Get<std::vector<Wg_Obj*>>() = std::vector<Wg_Obj*>(argv, argv + argc);
-			return v;
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_NewDictionary(Wg_Context* context, Wg_Obj** keys, Wg_Obj** values, int argc) {
-		std::vector<wings::Wg_ObjRef> refs;
-		WG_ASSERT(context && argc >= 0);
-		if (argc > 0) {
-			WG_ASSERT(keys && values);
-			for (int i = 0; i < argc; i++) {
-				refs.emplace_back(keys[i]);
-				refs.emplace_back(values[i]);
-				WG_ASSERT(keys[i] && values[i]);
-			}
-		}
-
-		// Pass a dummy kwargs to prevent stack overflow from recursion
-		Wg_Obj* dummyKwargs = wings::Alloc(context);
-		if (dummyKwargs == nullptr)
-			return nullptr;
-		dummyKwargs->type = "__map";
-		wings::WDict wd{};
-		dummyKwargs->data = &wd;
-
-		if (Wg_Obj* v = Wg_Call(context->builtins.dict, nullptr, 0, dummyKwargs)) {
-			for (int i = 0; i < argc; i++) {
-				refs.emplace_back(v);
-				try {
-					v->Get<wings::WDict>()[keys[i]] = values[i];
-				} catch (wings::HashException&) {
-					return nullptr;
-				}
-			}
-			return v;
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_NewSet(Wg_Context* context, Wg_Obj** argv, int argc) {
-		std::vector<wings::Wg_ObjRef> refs;
-		WG_ASSERT(context && argc >= 0);
-		if (argc > 0) {
-			WG_ASSERT(argv);
-			for (int i = 0; i < argc; i++) {
-				refs.emplace_back(argv[i]);
-				WG_ASSERT(argv[i]);
-			}
-		}
-
-		if (Wg_Obj* v = Wg_Call(context->builtins.set, nullptr, 0, nullptr)) {
-			for (int i = 0; i < argc; i++) {
-				try {
-					v->Get<wings::WSet>().insert(argv[i]);
-				} catch (wings::HashException&) {
-					return nullptr;
-				}
-			}
-			return v;
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_NewFunction(Wg_Context* context, Wg_Function fptr, void* userdata, const char* prettyName) {
-		WG_ASSERT(context && fptr);
-
-		Wg_Obj* obj = wings::Alloc(context);
-		if (obj == nullptr)
-			return nullptr;
-
-		obj->attributes = context->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Copy();
-		obj->type = "__func";
-		auto data = new Wg_Obj::Func;
-		Wg_SetUserdata(obj, data);
-		Wg_RegisterFinalizer(obj, [](void* ud) { delete (Wg_Obj::Func*)ud; }, data);
-
-		data->fptr = fptr;
-		data->userdata = userdata;
-		data->isMethod = false;
-		data->module = context->currentModule.top();
-		data->prettyName = prettyName ? prettyName : wings::DEFAULT_FUNC_NAME;
-		data->self = nullptr;
-
-		return obj;
-	}
-
-	Wg_Obj* Wg_BindMethod(Wg_Obj* klass, const char* name, Wg_Function fptr, void* userdata) {
-		WG_ASSERT(klass && fptr && Wg_IsClass(klass));
-		Wg_Context* context = klass->context;
-		wings::Wg_ObjRef ref(klass);
-		Wg_Obj* fn = Wg_NewFunction(context, fptr, userdata, name);
-		if (fn == nullptr)
-			return nullptr;
-		fn->Get<Wg_Obj::Func>().isMethod = true;
-		klass->Get<Wg_Obj::Class>().instanceAttributes.Set(name, fn);
-		return fn;
-	}
-
-	Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int basesLen) {
-		std::vector<wings::Wg_ObjRef> refs;
-		WG_ASSERT(context && name && basesLen >= 0);
-		if (basesLen > 0) {
-			WG_ASSERT(bases);
-			for (int i = 0; i < basesLen; i++) {
-				WG_ASSERT(bases[i] && Wg_IsClass(bases[i]));
-				refs.emplace_back(bases[i]);
-			}
-		}
-
-		// Allocate class
-		Wg_Obj* klass = wings::Alloc(context);
-		if (klass == nullptr) {
-			return nullptr;
-		}
-		refs.emplace_back(klass);
-		klass->type = "__class";
-		klass->data = new Wg_Obj::Class{ std::string(name) };
-		Wg_RegisterFinalizer(klass, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass->data);
-		klass->Get<Wg_Obj::Class>().module = context->currentModule.top();
-		klass->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", klass);
-		klass->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-
-		// Set bases
-		int actualBaseCount = basesLen ? basesLen : 1;
-		Wg_Obj** actualBases = basesLen ? bases : &context->builtins.object;
-		for (int i = 0; i < actualBaseCount; i++) {
-			klass->Get<Wg_Obj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<Wg_Obj::Class>().instanceAttributes);
-			klass->Get<Wg_Obj::Class>().bases.push_back(actualBases[i]);
-		}
-		if (Wg_Obj* basesTuple = Wg_NewTuple(context, actualBases, actualBaseCount)) {
-			klass->attributes.Set("__bases__", basesTuple);
-		} else {
-			return nullptr;
-		}
-
-		// Set construction function. This function forwards to __init__().
-		klass->Get<Wg_Obj::Class>().userdata = klass;
-		klass->Get<Wg_Obj::Class>().ctor = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
-			Wg_Obj* _classObj = (Wg_Obj*)Wg_GetFunctionUserdata(context);
-
-			Wg_Obj* instance = wings::Alloc(context);
-			if (instance == nullptr)
-				return nullptr;
-			wings::Wg_ObjRef ref(instance);
-
-			instance->attributes = _classObj->Get<Wg_Obj::Class>().instanceAttributes.Copy();
-			instance->type = _classObj->Get<Wg_Obj::Class>().name;
-
-			if (Wg_Obj* init = Wg_HasAttribute(instance, "__init__")) {
-				if (Wg_IsFunction(init)) {
-					Wg_Obj* kwargs = Wg_GetKwargs(context);
-					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
-					if (ret == nullptr) {
-						return nullptr;
-					} else if (!Wg_IsNone(ret)) {
-						Wg_RaiseException(context, WG_EXC_TYPEERROR, "__init__() returned a non NoneType type");
-						return nullptr;
-					}
-				}
-			}
-
-			return instance;
-		};
-
-		// Set init method
-		auto init = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
-			Wg_Obj* klass = (Wg_Obj*)Wg_GetFunctionUserdata(context);
-			if (argc < 1) {
-				Wg_RaiseArgumentCountError(klass->context, argc, -1);
-				return nullptr;
-			}
-
-			const auto& bases = klass->Get<Wg_Obj::Class>().bases;
-			if (bases.empty())
-				return nullptr;
-
-			if (Wg_Obj* baseInit = Wg_GetAttributeFromBase(argv[0], "__init__", bases[0])) {
-				Wg_Obj* kwargs = Wg_GetKwargs(context);
-				Wg_Obj* ret = Wg_Call(baseInit, argv + 1, argc - 1, kwargs);
-				if (ret == nullptr) {
-					return nullptr;
-				} else if (!Wg_IsNone(ret)) {
-					Wg_RaiseException(context, WG_EXC_TYPEERROR, "__init__() returned a non NoneType type");
-					return nullptr;
-				}
-			}
-
-			return Wg_None(context);
-		};
-		std::string initName = std::string(name) + ".__init__";
-
-		wings::Wg_ObjRef ref(klass);
-		Wg_Obj* initFn = Wg_BindMethod(klass, initName.c_str(), init, klass);
-		if (initFn == nullptr)
-			return nullptr;
-
-		Wg_IncRef(klass);
-		Wg_RegisterFinalizer(initFn, [](void* ud) { Wg_DecRef((Wg_Obj*)ud); }, klass);
-
-		return klass;
-	}
-
-	bool Wg_IsNone(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj == obj->context->builtins.none;
-	}
-
-	bool Wg_IsBool(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj == obj->context->builtins._true
-			|| obj == obj->context->builtins._false;
-	}
-
-	bool Wg_IsInt(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__int";
-	}
-
-	bool Wg_IsIntOrFloat(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__int" || obj->type == "__float";
-	}
-
-	bool Wg_IsString(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__str";
-	}
-
-	bool Wg_IsTuple(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__tuple";
-	}
-
-	bool Wg_IsList(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__list";
-	}
-
-	bool Wg_IsDictionary(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__map";
-	}
-
-	bool Wg_IsSet(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__set";
-	}
-
-	bool Wg_IsClass(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__class";
-	}
-
-	bool Wg_IsFunction(const Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->type == "__func";
-	}
-
-	bool Wg_GetBool(const Wg_Obj* obj) {
-		WG_ASSERT(obj && Wg_IsBool(obj));
-		return obj->Get<bool>();
-	}
-
-	Wg_int Wg_GetInt(const Wg_Obj* obj) {
-		WG_ASSERT(obj && Wg_IsInt(obj));
-		return obj->Get<Wg_int>();
-	}
-
-	Wg_float Wg_GetFloat(const Wg_Obj* obj) {
-		WG_ASSERT(obj && Wg_IsIntOrFloat(obj));
-		if (Wg_IsInt(obj)) return (Wg_float)obj->Get<Wg_int>();
-		else return obj->Get<Wg_float>();
-	}
-
-	const char* Wg_GetString(const Wg_Obj* obj, int* len) {
-		WG_ASSERT(obj && Wg_IsString(obj));
-		const auto& s = obj->Get<std::string>();
-		if (len)
-			*len = (int)s.size();
-		return s.c_str();
-	}
-
-	void Wg_SetUserdata(Wg_Obj* obj, void* userdata) {
-		WG_ASSERT_VOID(obj);
-		obj->data = userdata;
-	}
-
-	bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out) {
-		WG_ASSERT(obj && type);
-		if (obj->type == std::string(type)) {
-			if (out)
-				*out = obj->data;
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata) {
-		WG_ASSERT_VOID(obj && finalizer);
-		obj->finalizers.push_back({ finalizer, userdata });
-	}
-
-	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
-		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
-		Wg_Obj* mem = obj->attributes.Get(attribute);
-		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
-			mem->Get<Wg_Obj::Func>().self = obj;
-		}
-		return mem;
-	}
-
-	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute) {
-		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
-		Wg_Obj* mem = obj->attributes.Get(attribute);
-		if (mem == nullptr) {
-			Wg_RaiseAttributeError(obj, attribute);
-		} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
-			mem->Get<Wg_Obj::Func>().self = obj;
-		}
-		return mem;
-	}
-
-	void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value) {
-		WG_ASSERT_VOID(obj && attribute && value && wings::IsValidIdentifier(attribute));
-		obj->attributes.Set(attribute, value);
-	}
-
-	Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* attribute, Wg_Obj* baseClass) {
-		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
-
-		Wg_Obj* mem{};
-		if (baseClass == nullptr) {
-			mem = obj->attributes.GetFromBase(attribute);
-		} else {
-			mem = baseClass->Get<Wg_Obj::Class>().instanceAttributes.Get(attribute);
-		}
-
-		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
-			mem->Get<Wg_Obj::Func>().self = obj;
-		}
-		return mem;
-	}
-
-	Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj* const* types, int typesLen) {
-		WG_ASSERT(instance && typesLen >= 0 && (types || typesLen == 0));
-		for (int i = 0; i < typesLen; i++)
-			WG_ASSERT(types[i] && Wg_IsClass(types[i]));
-
-		// Cannot use Wg_HasAttribute here because instance is a const pointer
-		Wg_Obj* klass = instance->attributes.Get("__class__");
-		if (klass == nullptr)
-			return nullptr;
-		wings::Wg_ObjRef ref(klass);
-
-		std::queue<wings::Wg_ObjRef> toCheck;
-		toCheck.emplace(klass);
-
-		while (!toCheck.empty()) {
-			auto end = types + typesLen;
-			auto it = std::find(types, end, toCheck.front().Get());
-			if (it != end)
-				return *it;
-
-			Wg_Obj* bases = Wg_HasAttribute(toCheck.front().Get(), "__bases__");
-			if (bases && Wg_IsTuple(bases))
-				for (Wg_Obj* base : bases->Get<std::vector<Wg_Obj*>>())
-					toCheck.emplace(base);
-
-			toCheck.pop();
-		}
-		return nullptr;
-	}
-
-	bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback callback) {
-		WG_ASSERT(obj && callback);
-		Wg_Context* context = obj->context;
-
-		wings::Wg_ObjRef objRef(obj);
-
-		Wg_Obj* iter = Wg_CallMethod(obj, "__iter__", nullptr, 0);
-		if (iter == nullptr)
-			return false;
-		wings::Wg_ObjRef iterRef(iter);
-
-		while (true) {
-			Wg_Obj* yielded = Wg_CallMethod(iter, "__next__", nullptr, 0);
-
-			Wg_Obj* exc = Wg_GetException(context);
-			if (exc) {
-				if (Wg_IsInstance(exc, &context->builtins.stopIteration, 1)) {
-					Wg_ClearException(context);
-					return true;
-				} else {
-					return false;
-				}
-			}
-
-			WG_ASSERT(yielded); // If no exception was thrown then a value must be yielded
-			wings::Wg_ObjRef yieldedRef(yielded);
-			if (!callback(yielded, userdata))
-				return Wg_GetException(context) == nullptr;
-
-			if (Wg_GetException(context))
-				return false;
-		}
-	}
-
-	bool Wg_Unpack(Wg_Obj* obj, int count, Wg_Obj** out) {
-		WG_ASSERT(obj && (count == 0 || out));
-
-		Wg_Context* context = obj->context;
-		struct State {
-			Wg_Context* context;
-			Wg_Obj** array;
-			int count;
-			int index;
-		} s = { context, out, count, 0 };
-
-		bool success = Wg_Iterate(obj, &s, [](Wg_Obj* yielded, void* userdata) {
-			State* s = (State*)userdata;
-			if (s->index >= s->count) {
-				Wg_RaiseException(s->context, WG_EXC_VALUEERROR, "Too many values to unpack");
-			} else {
-				Wg_IncRef(yielded);
-				s->array[s->index] = yielded;
-				s->index++;
-			}
-			return true;
-			});
-
-		for (int i = s.index; i; i--)
-			Wg_DecRef(out[i - 1]);
-
-		if (!success) {
-			return false;
-		} else if (s.index < count) {
-			Wg_RaiseException(context, WG_EXC_VALUEERROR, "Not enough values to unpack");
-			return false;
-		} else {
-			return true;
-		}
-	}
-
-	Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
-		WG_ASSERT(context && !context->kwargs.empty());
-		return context->kwargs.back();
-	}
-
-	void* Wg_GetFunctionUserdata(Wg_Context* context) {
-		WG_ASSERT(context && !context->kwargs.empty());
-		return context->userdata.back();
-	}
-
-	Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
-		WG_ASSERT(callable && argc >= 0 && (argc == 0 || argv));
-		if (argc)
-			WG_ASSERT(argv);
-		for (int i = 0; i < argc; i++)
-			WG_ASSERT(argv[i]);
-
-		Wg_Context* context = callable->context;
-		
-		// Check recursion limit
-		if (context->kwargs.size() >= (size_t)context->config.maxRecursion) {
-			Wg_RaiseException(context, WG_EXC_RECURSIONERROR);
-			return nullptr;
-		}
-
-		// Call the __call__ method if object is neither a function nor a class
-		if (!Wg_IsFunction(callable) && !Wg_IsClass(callable)) {
-			return Wg_CallMethod(callable, "__call__", argv, argc);
-		}
-
-		// Validate keyword arguments
-		if (kwargsDict) {
-			if (!Wg_IsDictionary(kwargsDict)) {
-				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments must be a dictionary");
-				return nullptr;
-			}
-			for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
-				if (!Wg_IsString(key)) {
-					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments dictionary must only contain string keys");
-					return nullptr;
-				}
-			}
-		}
-
-		// Prevent arguments from being garbage collected
-		std::vector<wings::Wg_ObjRef> refs;
-		refs.emplace_back(callable);
-		for (int i = 0; i < argc; i++)
-			refs.emplace_back(argv[i]);
-
-		// Get the raw function pointer, userdata, module, and self
-		// depending on whether the callable is a function or class.
-		Wg_Obj* (*fptr)(Wg_Context*, Wg_Obj**, int);
-		void* userdata = nullptr;
-		std::string_view module;
-		Wg_Obj* self = nullptr;
-		if (Wg_IsFunction(callable)) {
-			const auto& func = callable->Get<Wg_Obj::Func>();
-			if (func.self)
-				self = func.self;
-			fptr = func.fptr;
-			userdata = func.userdata;
-			module = func.module;
-		} else {
-			const auto& klass = callable->Get<Wg_Obj::Class>();
-			fptr = klass.ctor;
-			userdata = klass.userdata;
-			module = klass.module;
-		}
-
-		// Prepare arguments into a contiguous buffer
-		std::vector<Wg_Obj*> argsWithSelf;
-		if (self) {
-			argsWithSelf.push_back(self);
-			refs.emplace_back(self);
-		}
-		argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
-
-		// Push various data onto stacks
-		context->currentModule.push(module);
-		context->userdata.push_back(userdata);
-		context->kwargs.push_back(kwargsDict);
-		if (Wg_IsFunction(callable)) {
-			const auto& func = callable->Get<Wg_Obj::Func>();
-			context->currentTrace.push_back(wings::TraceFrame{
-				{},
-				"",
-				func.module,
-				func.prettyName
-				});
-		}
-		
-		// Perform the call
-		Wg_Obj* ret = nullptr;
-		try {
-			ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
-		} catch (std::bad_alloc&) {
-			Wg_RaiseException(context, WG_EXC_MEMORYERROR);
-		}
-		
-		// Pop the data off the stacks
-		context->currentModule.pop();
-		context->userdata.pop_back();
-		context->kwargs.pop_back();
-		if (Wg_IsFunction(callable)) {
-			context->currentTrace.pop_back();
-		}
-
-		return ret;
-	}
-
-	Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
-		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
-		if (argc)
-			WG_ASSERT(argv);
-		for (int i = 0; i < argc; i++)
-			WG_ASSERT(argv[i]);
-
-		if (Wg_Obj* method = Wg_GetAttribute(obj, member)) {
-			return Wg_Call(method, argv, argc, kwargsDict);
-		} else {
-			return nullptr;
-		}
-	}
-
-	Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict, Wg_Obj* baseClass) {
-		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
-		if (argc)
-			WG_ASSERT(argv);
-		for (int i = 0; i < argc; i++)
-			WG_ASSERT(argv[i]);
-
-		if (Wg_Obj* method = Wg_GetAttributeFromBase(obj, member, baseClass)) {
-			return Wg_Call(method, argv, argc, kwargsDict);
-		} else {
-			Wg_RaiseAttributeError(obj, member);
-			return nullptr;
-		}
-	}
-
-	bool Wg_ParseKwargs(Wg_Obj* kwargs, const char* const* keys, int count, Wg_Obj** out) {
-		WG_ASSERT(keys && out && count > 0 && (!kwargs || Wg_IsDictionary(kwargs)));
-
-		if (kwargs == nullptr) {
-			for (int i = 0; i < count; i++)
-				out[i] = nullptr;
-			return true;
-		}
-
-		wings::Wg_ObjRef ref(kwargs);
-		auto& buf = kwargs->Get<wings::WDict>();
-		for (int i = 0; i < count; i++) {
-			Wg_Obj* key = Wg_NewString(kwargs->context, keys[i]);
-			if (key == nullptr)
-				return false;
-
-			wings::WDict::iterator it;
-			try {
-				it = buf.find(key);
-			} catch (wings::HashException&) {
-				return false;
-			}
-
-			if (it != buf.end()) {
-				out[i] = it->second;
-			} else {
-				out[i] = nullptr;
-			}
-		}
-		return true;
-	}
-
-	Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index) {
-		WG_ASSERT(obj && index);
-		return Wg_CallMethod(obj, "__getitem__", &index, 1);
-	}
-
-	Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value) {
-		WG_ASSERT(obj && index && value);
-		Wg_Obj* argv[2] = { index, value };
-		return Wg_CallMethod(obj, "__setitem__", argv, 2);
-	}
-
-	Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg) {
-		WG_ASSERT(arg);
-		Wg_Context* context = arg->context;
-		switch (op) {
-		case WG_UOP_POS:
-			return Wg_CallMethod(arg, "__pos__", nullptr, 0);
-		case WG_UOP_NEG:
-			return Wg_CallMethod(arg, "__neg__", nullptr, 0);
-		case WG_UOP_BITNOT:
-			return Wg_CallMethod(arg, "__invert__", nullptr, 0);
-		case WG_UOP_HASH:
-			return Wg_Call(context->builtins.hash, &arg, 1);
-		case WG_UOP_LEN:
-			return Wg_Call(context->builtins.len, &arg, 1);
-		case WG_UOP_BOOL:
-			if (Wg_IsBool(arg))
-				return arg;
-			return Wg_Call(context->builtins._bool, &arg, 1);
-		case WG_UOP_INT:
-			if (Wg_IsInt(arg))
-				return arg;
-			return Wg_Call(context->builtins._int, &arg, 1);
-		case WG_UOP_FLOAT:
-			if (Wg_IsIntOrFloat(arg))
-				return arg;
-			return Wg_Call(context->builtins._float, &arg, 1);
-		case WG_UOP_STR:
-			if (Wg_IsString(arg))
-				return arg;
-			return Wg_Call(context->builtins.str, &arg, 1);
-		case WG_UOP_REPR:
-			return Wg_Call(context->builtins.repr, &arg, 1);
-		case WG_UOP_INDEX: {
-			Wg_Obj* index = Wg_CallMethod(arg, "__index__", nullptr, 0);
-			if (index == nullptr) {
-				return nullptr;
-			} else if (!Wg_IsInt(index)) {
-				Wg_RaiseException(context, WG_EXC_TYPEERROR, "__index__() returned a non integer type");
-				return nullptr;
-			} else {
-				return index;
-			}
-		}
-		default:
-			WG_UNREACHABLE();
-		}
-	}
-
-	static const std::unordered_map<Wg_BinOp, const char*> OP_METHOD_NAMES = {
-		{ WG_BOP_ADD, "__add__" },
-		{ WG_BOP_SUB, "__sub__" },
-		{ WG_BOP_MUL, "__mul__" },
-		{ WG_BOP_DIV, "__truediv__" },
-		{ WG_BOP_FLOORDIV, "__floordiv__" },
-		{ WG_BOP_MOD, "__mod__" },
-		{ WG_BOP_POW, "__pow__" },
-		{ WG_BOP_BITAND, "__and__" },
-		{ WG_BOP_BITOR, "__or__" },
-		{ WG_BOP_BITXOR, "__not__" },
-		{ WG_BOP_SHL, "__lshift__" },
-		{ WG_BOP_SHR, "__rshift__" },
-		{ WG_BOP_IN, "__contains__" },
-		{ WG_BOP_EQ, "__eq__" },
-		{ WG_BOP_NE, "__ne__" },
-		{ WG_BOP_LT, "__lt__" },
-		{ WG_BOP_LE, "__le__" },
-		{ WG_BOP_GT, "__gt__" },
-		{ WG_BOP_GE, "__ge__" },
-	};
-
-	Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs) {
-		WG_ASSERT(lhs && rhs);
-
-		if (op == WG_BOP_IN)
-			std::swap(lhs, rhs);
-
-		auto method = OP_METHOD_NAMES.find(op);
-
-		switch (op) {
-		case WG_BOP_ADD:
-		case WG_BOP_SUB:
-		case WG_BOP_MUL:
-		case WG_BOP_DIV:
-		case WG_BOP_FLOORDIV:
-		case WG_BOP_MOD:
-		case WG_BOP_POW:
-		case WG_BOP_BITAND:
-		case WG_BOP_BITOR:
-		case WG_BOP_BITXOR:
-		case WG_BOP_SHL:
-		case WG_BOP_SHR:
-			return Wg_CallMethod(lhs, method->second, &rhs, 1);
-		case WG_BOP_EQ:
-		case WG_BOP_NE:
-		case WG_BOP_LT:
-		case WG_BOP_LE:
-		case WG_BOP_GT:
-		case WG_BOP_GE:
-		case WG_BOP_IN: {
-			Wg_Obj* boolResult = Wg_CallMethod(lhs, method->second, &rhs, 1);
-			if (!Wg_IsBool(boolResult)) {
-				std::string message = method->second;
-				message += "() returned a non bool type";
-				Wg_RaiseException(boolResult->context, WG_EXC_TYPEERROR, message.c_str());
-				return nullptr;
-			}
-			return boolResult;
-		}
-		case WG_BOP_NOTIN:
-			if (Wg_Obj* in = Wg_BinaryOp(WG_BOP_IN, lhs, rhs)) {
-				return Wg_UnaryOp(WG_UOP_NOT, in);
-			} else {
-				return nullptr;
-			}
-		case WG_BOP_AND: {
-			Wg_Obj* lhsb = Wg_UnaryOp(WG_UOP_BOOL, lhs);
-			if (lhsb == nullptr)
-				return nullptr;
-			if (!Wg_GetBool(lhsb))
-				return lhsb;
-			return Wg_UnaryOp(WG_UOP_BOOL, rhs);
-		}
-		case WG_BOP_OR: {
-			Wg_Obj* lhsb = Wg_UnaryOp(WG_UOP_BOOL, lhs);
-			if (lhsb == nullptr)
-				return nullptr;
-			if (Wg_GetBool(lhsb))
-				return lhsb;
-			return Wg_UnaryOp(WG_UOP_BOOL, rhs);
-		}
-		default:
-			WG_UNREACHABLE();
-		}
-	}
-
-	const char* Wg_GetErrorMessage(Wg_Context* context) {
-		WG_ASSERT(context);
-
-		if (context->currentException == nullptr) {
-			return (context->traceMessage = "Ok").c_str();
-		}
-
-		std::stringstream ss;
-		ss << "Traceback (most recent call last):\n";
-
-		for (const auto& frame : context->exceptionTrace) {
-			//if (frame.module == "__builtins__" ||
-			//	frame.module == "math" ||
-			//	frame.module == "random"
-			//	)
-			//{
-			//	continue;
-			//}
-
-			ss << "  ";
-			bool written = false;
-			
-			ss << "Module " << frame.module;
-			written = true;
-
-			if (frame.srcPos.line != (size_t)-1) {
-				if (written) ss << ", ";
-				ss << "Line " << (frame.srcPos.line + 1);
-				written = true;
-			}
-
-			if (frame.func != wings::DEFAULT_FUNC_NAME) {
-				if (written) ss << ", ";
-				ss << "Function " << frame.func << "()";
-			}
-
-			ss << "\n";
-
-			if (!frame.lineText.empty()) {
-				std::string lineText = frame.lineText;
-				std::replace(lineText.begin(), lineText.end(), '\t', ' ');
-
-				size_t skip = lineText.find_first_not_of(' ');
-				ss << "    " << (lineText.c_str() + skip) << "\n";
-				if (frame.syntaxError && skip <= frame.srcPos.column)
-				    ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
-			}
-		}
-
-		ss << context->currentException->type;
-		if (Wg_Obj* msg = Wg_HasAttribute(context->currentException, "_message"))
-			if (Wg_IsString(msg) && *Wg_GetString(msg))
-				ss << ": " << Wg_GetString(msg);
-		ss << "\n";
-
-		context->traceMessage = ss.str();
-		return context->traceMessage.c_str();
-	}
-
-	Wg_Obj* Wg_GetException(Wg_Context* context) {
-		WG_ASSERT(context);
-		return context->currentException;
-	}
-
-	void Wg_ClearException(Wg_Context* context) {
-		WG_ASSERT_VOID(context);
-		context->currentException = nullptr;
-		context->exceptionTrace.clear();
-		//context->currentTrace.clear();
-		context->traceMessage.clear();
-	}
-
-	void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message) {
-		WG_ASSERT_VOID(context);
-		switch (type) {
-		case WG_EXC_BASEEXCEPTION:
-			return Wg_RaiseExceptionClass(context->builtins.baseException, message);
-		case WG_EXC_SYSTEMEXIT:
-			return Wg_RaiseExceptionClass(context->builtins.systemExit, message);
-		case WG_EXC_EXCEPTION:
-			return Wg_RaiseExceptionClass(context->builtins.exception, message);
-		case WG_EXC_STOPITERATION:
-			return Wg_RaiseExceptionClass(context->builtins.stopIteration, message);
-		case WG_EXC_ARITHMETICERROR:
-			return Wg_RaiseExceptionClass(context->builtins.arithmeticError, message);
-		case WG_EXC_OVERFLOWERROR:
-			return Wg_RaiseExceptionClass(context->builtins.overflowError, message);
-		case WG_EXC_ZERODIVISIONERROR:
-			return Wg_RaiseExceptionClass(context->builtins.zeroDivisionError, message);
-		case WG_EXC_ATTRIBUTEERROR:
-			return Wg_RaiseExceptionClass(context->builtins.attributeError, message);
-		case WG_EXC_IMPORTERROR:
-			return Wg_RaiseExceptionClass(context->builtins.importError, message);
-		case WG_EXC_LOOKUPERROR:
-			return Wg_RaiseExceptionClass(context->builtins.lookupError, message);
-		case WG_EXC_INDEXERROR:
-			return Wg_RaiseExceptionClass(context->builtins.indexError, message);
-		case WG_EXC_KEYERROR:
-			return Wg_RaiseExceptionClass(context->builtins.keyError, message);
-		case WG_EXC_MEMORYERROR:
-			return Wg_RaiseExceptionObject(context->builtins.memoryErrorInstance);
-		case WG_EXC_NAMEERROR:
-			return Wg_RaiseExceptionClass(context->builtins.nameError, message);
-		case WG_EXC_OSERROR:
-			return Wg_RaiseExceptionClass(context->builtins.osError, message);
-		case WG_EXC_ISADIRECTORYERROR:
-			return Wg_RaiseExceptionClass(context->builtins.isADirectoryError, message);
-		case WG_EXC_RUNTIMEERROR:
-			return Wg_RaiseExceptionClass(context->builtins.runtimeError, message);
-		case WG_EXC_NOTIMPLEMENTEDERROR:
-			return Wg_RaiseExceptionClass(context->builtins.notImplementedError, message);
-		case WG_EXC_RECURSIONERROR:
-			return Wg_RaiseExceptionObject(context->builtins.recursionErrorInstance);
-		case WG_EXC_SYNTAXERROR:
-			return Wg_RaiseExceptionClass(context->builtins.syntaxError, message);
-		case WG_EXC_TYPEERROR:
-			return Wg_RaiseExceptionClass(context->builtins.typeError, message);
-		case WG_EXC_VALUEERROR:
-			return Wg_RaiseExceptionClass(context->builtins.valueError, message);
-		default:
-			WG_ASSERT_VOID(false);
-		}
-	}
-
-	void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message) {
-		WG_ASSERT_VOID(klass);
-		wings::Wg_ObjRef ref(klass);
-
-		Wg_Obj* msg = Wg_NewString(klass->context, message);
-		if (msg == nullptr) {
-			return;
-		}
-
-		// If exception creation was successful then set the exception.
-		// Otherwise the exception will already be set by some other code.
-		if (Wg_Obj* exceptionObject = Wg_Call(klass, &msg, msg ? 1 : 0)) {
-			Wg_RaiseExceptionObject(exceptionObject);
-		}
-	}
-
-	void Wg_RaiseExceptionObject(Wg_Obj* obj) {
-		WG_ASSERT_VOID(obj);
-		Wg_Context* context = obj->context;
-		if (Wg_IsInstance(obj, &context->builtins.baseException, 1)) {
-			context->currentException = obj;
-			context->exceptionTrace.clear();
-			for (const auto& frame : context->currentTrace)
-				context->exceptionTrace.push_back(frame.ToOwned());
-		} else {
-			Wg_RaiseException(context, WG_EXC_TYPEERROR, "exceptions must derive from BaseException");
-		}
-	}
-
-	void Wg_RaiseArgumentCountError(Wg_Context* context, int given, int expected) {
-		WG_ASSERT_VOID(context && given >= 0 && expected >= -1);
-		std::string msg;
-		if (expected != -1) {
-			msg = "Function takes " +
-				std::to_string(expected) +
-				" argument(s) but " +
-				std::to_string(given) +
-				(given == 1 ? " was given" : " were given");
-		} else {
-			msg = "function does not take " +
-				std::to_string(given) +
-				" argument(s)";
-		}
-		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
-	}
-
-	void Wg_RaiseArgumentTypeError(Wg_Context* context, int index, const char* expected) {
-		WG_ASSERT_VOID(context && index >= 0 && expected);
-		std::string msg = "Argument " + std::to_string(index + 1)
-			+ " Expected type " + expected;
-		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
-	}
-
-	void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute) {
-		WG_ASSERT_VOID(obj && attribute);
-		std::string msg = "'" + wings::WObjTypeToString(obj) +
-			"' object has no attribute '" + attribute + "'";
-		Wg_RaiseException(obj->context, WG_EXC_ATTRIBUTEERROR, msg.c_str());
-	}
-
-	void Wg_RaiseZeroDivisionError(Wg_Context* context) {
-		WG_ASSERT_VOID(context);
-		Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR, "division by zero");
-	}
-
-	void Wg_RaiseIndexError(Wg_Context* context) {
-		WG_ASSERT_VOID(context);
-		Wg_RaiseException(context, WG_EXC_INDEXERROR, "index out of range");
-	}
-
-	void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key) {
-		WG_ASSERT_VOID(context);
-
-		if (key == nullptr) {
-			Wg_RaiseException(context, WG_EXC_KEYERROR);
-		} else {
-			std::string s = "<exception str() failed>";
-			if (Wg_Obj* repr = Wg_UnaryOp(WG_UOP_REPR, key))
-				s = Wg_GetString(repr);
-			Wg_RaiseException(context, WG_EXC_KEYERROR, s.c_str());
-		}
-	}
-
-	void Wg_RaiseNameError(Wg_Context* context, const char* name) {
-		WG_ASSERT_VOID(context && name);
-		std::string msg = "The name '";
-		msg += name;
-		msg += "' is not defined";
-		Wg_RaiseException(context, WG_EXC_NAMEERROR, msg.c_str());
-	}
-
-	void Wg_CollectGarbage(Wg_Context* context) {
-		WG_ASSERT_VOID(context);
-
-		std::deque<const Wg_Obj*> inUse;
-		if (!context->closing) {
-			if (context->currentException)
-				inUse.push_back(context->currentException);
-			for (const auto& obj : context->mem)
-				if (obj->refCount)
-					inUse.push_back(obj.get());
-			for (auto& [_, globals] : context->globals)
-				for (auto& var : globals)
-					inUse.push_back(*var.second);
-			for (Wg_Obj* obj : context->kwargs)
-				if (obj)
-					inUse.push_back(obj);
-			for (auto& obj : context->builtins.GetAll())
-				if (obj)
-					inUse.push_back(obj);
-			if (context->argv)
-				inUse.push_back(context->argv);
-			for (const auto& executor : context->executors)
-				executor->GetReferences(inUse);
-		}
-
-		// Recursively find objects in use
-		std::unordered_set<const Wg_Obj*> traversed;
-		while (inUse.size()) {
-			auto obj = inUse.back();
-			inUse.pop_back();
-			if (!traversed.contains(obj)) {
-				traversed.insert(obj);
-
-				if (Wg_IsTuple(obj) || Wg_IsList(obj)) {
-					inUse.insert(
-						inUse.end(),
-						obj->Get<std::vector<Wg_Obj*>>().begin(),
-						obj->Get<std::vector<Wg_Obj*>>().end()
-					);
-				} else if (Wg_IsDictionary(obj)) {
-					for (const auto& [key, value] : obj->Get<wings::WDict>()) {
-						inUse.push_back(key);
-						inUse.push_back(value);
-					}
-				} else if (Wg_IsSet(obj)) {
-					for (Wg_Obj* value : obj->Get<wings::WSet>()) {
-						inUse.push_back(value);
-					}
-				} else if (Wg_IsFunction(obj)) {
-					const auto& fn = obj->Get<Wg_Obj::Func>();
-					if (fn.self) {
-						inUse.push_back(fn.self);
-					}
-					if (fn.fptr == &wings::DefObject::Run) {
-						auto* def = (wings::DefObject*)fn.userdata;
-						for (const auto& capture : def->captures)
-							inUse.push_back(*capture.second);
-						for (const auto& arg : def->defaultParameterValues)
-							inUse.push_back(arg);
-					}
-				} else if (Wg_IsClass(obj)) {
-					inUse.insert(
-						inUse.end(),
-						obj->Get<Wg_Obj::Class>().bases.begin(),
-						obj->Get<Wg_Obj::Class>().bases.end()
-					);
-					obj->Get<Wg_Obj::Class>().instanceAttributes.ForEach([&](auto& entry) {
-						inUse.push_back(entry);
-						});
-				}
-
-				obj->attributes.ForEach([&](auto& entry) {
-					inUse.push_back(entry);
-					});
-			}
-		}
-
-		// Call finalizers
-		for (auto& obj : context->mem)
-			if (!traversed.contains(obj.get()))
-				for (const auto& finalizer : obj->finalizers)
-					finalizer.first(finalizer.second);
-
-		// Remove unused objects
-		context->mem.erase(
-			std::remove_if(
-				context->mem.begin(),
-				context->mem.end(),
-				[&traversed](const auto& obj) { return !traversed.contains(obj.get()); }
-			),
-			context->mem.end()
-		);
-
-		context->lastObjectCountAfterGC = context->mem.size();
-	}
-
-	void Wg_IncRef(Wg_Obj* obj) {
-		WG_ASSERT_VOID(obj);
-		obj->refCount++;
-	}
-
-	void Wg_DecRef(Wg_Obj* obj) {
-		WG_ASSERT_VOID(obj && obj->refCount > 0);
-		obj->refCount--;
-	}
-
-	Wg_Context* Wg_GetContextFromObject(Wg_Obj* obj) {
-		WG_ASSERT(obj);
-		return obj->context;
-	}
-
-} // extern "C"
-
-
-#include <cmath>
-#include <limits>
-
-namespace wings {
-	namespace mathmodule {
-		static constexpr const char* MATH_CODE = R"(
-def comb(n, k):
-	if not isinstance(n, int) or not isinstance(k, int):
-		raise TypeError("comb() only accepts integers")
-	if n < 0 or k < 0:
-		raise ValueError("comb() only accepts non-negative integers")
-	if k > n:
-		return 0
-	return factorial(n) // (factorial(k) * factorial(n - k))
-
-def fabs(x):
-	return float(abs(x))
-
-def factorial(n):
-	if not isinstance(n, int):
-		raise TypeError("factorial() only accepts integers")
-	if n < 0:
-		raise ValueError("factorial() only accepts non-negative integers")
-	if n == 0:
-		return 1
-	return n * factorial(n - 1)
-
-def gcd(*integers):
-	if len(integers) == 0:
-		raise TypeError("gcd() requires at least one argument")
-	for i in integers:
-		if not isinstance(i, int):
-			raise TypeError("gcd() only accepts integers")
-	if len(integers) == 1:
-		return abs(integers[0])
-	if len(integers) == 2:
-		(a, b) = integers
-		if a == 0:
-			return abs(b)
-		if b == 0:
-			return abs(a)
-		while b != 0:
-			(a, b) = (b, a % b)
-		return abs(a)
-	return gcd(gcd(integers[0], integers[1]), *integers[2:])
-
-def lcm(*integers):
-	if len(integers) == 0:
-		raise TypeError("lcm() requires at least one argument")
-	for i in integers:
-		if not isinstance(i, int):
-			raise TypeError("lcm() only accepts integers")
-	if len(integers) == 1:
-		return abs(integers[0])
-	if len(integers) == 2:
-		(a, b) = integers
-		if a == 0 or b == 0:
-			return 0
-		return abs(a * b) // gcd(a, b)
-	return lcm(lcm(integers[0], integers[1]), *integers[2:])
-
-def modf(x):
-	r = x % 1.0
-	return (r, x - r)
-
-def perm(n, k=None):
-	if not isinstance(n, int):
-		raise TypeError("perm() only accepts integers")
-	if n < 0:
-		raise ValueError("perm() only accepts non-negative integers")
-	if k is None:
-		k = n
-	if not isinstance(k, int):
-		raise TypeError("perm() only accepts integers")
-	if k < 0:
-		raise ValueError("perm() only accepts non-negative integers")
-	if k > n:
-		return 0
-	return factorial(n) // factorial(n - k)
-
-def trunc(x):
-	if x >= 0:
-		return int(x)
-	return int(x) - 1
-
-def exp(x):
-	return e ** x
-
-def log1p(x):
-	return log(1 + x)
-
-def log2(x):
-	return log(x, 2)
-
-def log10(x):
-	return log(x, 10)
-
-def pow(x, y):
-	if x == 1 or y == 0:
-		return 1
-	if isfinite(x) and isfinite(y) and x < 0 and isinstance(y, int):
-		raise ValueError("negative number cannot be raised to a fractional power")
-	return x ** y
-
-def sqrt(x):
-	return x ** 0.5
-
-def dist(p, q):
-	return sqrt(sum([(z[0] - z[1]) ** 2 for z in zip(p, q)]))
-
-def hypot(*coords):
-	return sqrt(sum([x ** 2 for x in coords]))
-
-def degrees(x):
-	return x * 180.0 / pi
-
-def radians(x):
-	return x * pi / 180.0
-)";
-
-		constexpr Wg_float MATH_E = (Wg_float)2.71828182845904523536;
-		constexpr Wg_float MATH_PI = (Wg_float)3.14159265358979323846;
-
-		static Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			if (Wg_IsIntOrFloat(argv[0])) {
-				return Wg_NewInt(context, (Wg_int)std::ceil(Wg_GetFloat(argv[0])));
-			}
-			return Wg_CallMethod(argv[0], "__ceil__", nullptr, 0);
-		}
-
-		static Wg_Obj* floor(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			if (Wg_IsIntOrFloat(argv[0])) {
-				return Wg_NewInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0])));
-			}
-			return Wg_CallMethod(argv[0], "__floor__", nullptr, 0);
-		}
-
-		using FpCheck = bool(*)(Wg_float);
-
-		template <FpCheck f>
-		static Wg_Obj* isx(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			return Wg_NewBool(context, f(Wg_GetFloat(argv[0])));
-		}
-
-		static Wg_Obj* isfinite(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return isx<std::isfinite>(context, argv, argc);
-		}
-
-		static Wg_Obj* isinf(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return isx<std::isinf>(context, argv, argc);
-		}
-
-		static Wg_Obj* isnan(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return isx<std::isnan>(context, argv, argc);
-		}
-
-		static Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			Wg_float base = MATH_E;
-			if (argc == 2) {
-				WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-				base = Wg_GetFloat(argv[1]);
-			}
-			return Wg_NewFloat(context, std::log(Wg_GetFloat(argv[0])) / std::log(base));
-		}
-
-		using Op = Wg_float(*)(Wg_float);
-
-		template <Op op>
-		static Wg_Obj* opx(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			return Wg_NewFloat(context, op(Wg_GetFloat(argv[0])));
-		}
-
-		static Wg_Obj* cos(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::cos>(context, argv, argc);
-		}
-
-		static Wg_Obj* sin(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::sin>(context, argv, argc);
-		}
-
-		static Wg_Obj* tan(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::tan>(context, argv, argc);
-		}
-
-		static Wg_Obj* acos(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::acos>(context, argv, argc);
-		}
-
-		static Wg_Obj* asin(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::asin>(context, argv, argc);
-		}
-
-		static Wg_Obj* atan(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::atan>(context, argv, argc);
-		}
-
-		static Wg_Obj* cosh(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::cosh>(context, argv, argc);
-		}
-
-		static Wg_Obj* sinh(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::sinh>(context, argv, argc);
-		}
-
-		static Wg_Obj* tanh(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::tanh>(context, argv, argc);
-		}
-
-		static Wg_Obj* acosh(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::acosh>(context, argv, argc);
-		}
-
-		static Wg_Obj* asinh(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::asinh>(context, argv, argc);
-		}
-
-		static Wg_Obj* atanh(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::atanh>(context, argv, argc);
-		}
-
-		static Wg_Obj* erf(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::erf>(context, argv, argc);
-		}
-
-		static Wg_Obj* erfc(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::erfc>(context, argv, argc);
-		}
-
-		static Wg_Obj* gamma(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::tgamma>(context, argv, argc);
-		}
-
-		static Wg_Obj* lgamma(Wg_Context* context, Wg_Obj** argv, int argc) {
-			return opx<std::lgamma>(context, argv, argc);
-		}
-
-		static Wg_Obj* atan2(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(2);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_NewFloat(context, std::atan2(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
-		}
-	}
-	
-	bool ImportMath(Wg_Context* context) {
-		using namespace mathmodule;
-		try {
-			RegisterFunction(context, "ceil", ceil);
-			RegisterFunction(context, "floor", floor);
-			RegisterFunction(context, "isfinite", isfinite);
-			RegisterFunction(context, "isinf", isinf);
-			RegisterFunction(context, "isnan", isnan);
-			RegisterFunction(context, "log", log);
-			RegisterFunction(context, "cos", cos);
-			RegisterFunction(context, "sin", sin);
-			RegisterFunction(context, "tan", tan);
-			RegisterFunction(context, "acos", acos);
-			RegisterFunction(context, "asin", asin);
-			RegisterFunction(context, "atan", atan);
-			RegisterFunction(context, "atan2", atan2);
-			RegisterFunction(context, "cosh", cosh);
-			RegisterFunction(context, "sinh", sinh);
-			RegisterFunction(context, "tanh", tanh);
-			RegisterFunction(context, "acosh", acosh);
-			RegisterFunction(context, "asinh", asinh);
-			RegisterFunction(context, "atanh", atanh);
-			RegisterFunction(context, "erf", erf);
-			RegisterFunction(context, "erfc", erfc);
-			RegisterFunction(context, "gamma", gamma);
-			RegisterFunction(context, "lgamma", lgamma);
-
-			RegisterConstant(context, "e", Wg_NewFloat, MATH_E);
-			RegisterConstant(context, "inf", Wg_NewFloat, std::numeric_limits<Wg_float>::infinity());
-			RegisterConstant(context, "nan", Wg_NewFloat, std::numeric_limits<Wg_float>::quiet_NaN());
-			RegisterConstant(context, "pi", Wg_NewFloat, MATH_PI);
-			RegisterConstant(context, "tau", Wg_NewFloat, 2 * MATH_PI);
-
-			if (Execute(context, MATH_CODE, "math") == nullptr)
-				throw LibraryInitException();
-
-			return true;
-		} catch (LibraryInitException&) {
-			return false;
-		}
-	}
-}
-
-
-#include <random>
-
-namespace wings {
-	namespace randommodule {
-		static constexpr const char* RAND_CODE = R"(
-def choice(seq):
-	t = tuple(seq)
-	return t[randint(0, len(t) - 1)]
-
-def getrandbits(n):
-	x = 0
-	for i in range(n):
-		x <<= 1
-		if random() < 0.5:
-			x |= 1
-	return x
-
-def randrange(*args):
-	return choice(range(*args))
-		)";
-
-		static Wg_Obj* randint(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(2);
-			WG_EXPECT_ARG_TYPE_INT(0);
-			WG_EXPECT_ARG_TYPE_INT(1);
-			Wg_int lower = Wg_GetInt(argv[0]);
-			Wg_int upper = Wg_GetInt(argv[1]);
-			return Wg_NewInt(context, context->rng.Int(lower, upper));
-		}
-
-		static Wg_Obj* random(Wg_Context* context, Wg_Obj**, int argc) {
-			WG_EXPECT_ARG_COUNT(0);
-			return Wg_NewFloat(context, context->rng.Rand());
-		}
-
-		static Wg_Obj* seed(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_INT(0);
-			context->rng.Seed(Wg_GetInt(argv[0]));
-			return Wg_None(context);
-		}
-
-		static Wg_Obj* shuffle(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_LIST(0);
-			auto& li = argv[0]->Get<std::vector<Wg_Obj*>>();
-			std::shuffle(li.begin(), li.end(), context->rng.Engine());
-			return Wg_None(context);
-		}
-
-		static Wg_Obj* uniform(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(2);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			Wg_float lower = Wg_GetFloat(argv[0]);
-			Wg_float upper = Wg_GetFloat(argv[1]);
-			if (lower > upper) {
-				Wg_RaiseException(context, WG_EXC_VALUEERROR, "Lower bound must be less than or equal to upper bound");
-				return nullptr;
-			}
-			return Wg_NewFloat(context, context->rng.Float(lower, upper));
-		}
-	}
-
-	bool ImportRandom(Wg_Context* context) {
-		using namespace randommodule;
-		try {
-			RegisterFunction(context, "seed", seed);
-			RegisterFunction(context, "shuffle", shuffle);
-			RegisterFunction(context, "randint", randint);
-			RegisterFunction(context, "random", random);
-			RegisterFunction(context, "uniform", uniform);
-
-			if (!Execute(context, RAND_CODE, "random"))
-				throw LibraryInitException();
-			
-			return true;
-		} catch (LibraryInitException&) {
-			return false;
-		}
-	}
 }
 
 
@@ -11117,18 +7485,19 @@ namespace wings {
 
 		if (expr) {
 			std::vector<Statement> body = std::move(parseResult.parseTree.expr.def.body);
-			if (body.size() != 1 || body[0].type != Statement::Type::Expr) {
+			if (body.size() != 1 || !std::holds_alternative<stat::Expr>(body[0].data)) {
 				raiseException(CodeError::Bad("Invalid syntax"));
 				return nullptr;
 			}
 
-			Statement ret{};
-			ret.srcPos = body[0].srcPos;
-			ret.type = Statement::Type::Return;
-			ret.expr = std::move(body[0].expr);
+			stat::Return ret;
+			ret.expr = std::move(body[0].Get<stat::Expr>().expr);
+			Statement stat;
+			stat.srcPos = body[0].srcPos;
+			stat.data = std::move(ret);
 
 			parseResult.parseTree.expr.def.body.clear();
-			parseResult.parseTree.expr.def.body.push_back(std::move(ret));
+			parseResult.parseTree.expr.def.body.push_back(std::move(stat));
 		}
 
 		auto* def = new DefObject();
@@ -11188,29 +7557,6 @@ namespace wings {
 	std::mt19937_64& Rng::Engine() {
 		return engine;
 	}
-	
-	bool InitArgv(Wg_Context* context, const char* const* argv, int argc) {
-		Wg_Obj* list = Wg_NewList(context);
-		if (list == nullptr)
-			return false;
-
-		const char* empty = "";
-		if (argc == 0) {
-			argv = &empty;
-			argc = 1;
-		}
-		
-		for (int i = 0; i < argc; i++) {
-			Wg_Obj* str = Wg_NewString(context, argv[i]);
-			if (str == nullptr)
-				return false;
-			if (Wg_CallMethod(list, "append", &str, 1) == nullptr)
-				return false;
-		}
-		
-		context->argv = list;
-		return true;
-	}
 }
 
 
@@ -11221,6 +7567,7 @@ namespace wings {
 
 	static thread_local std::stack<std::vector<size_t>> breakInstructions;
 	static thread_local std::stack<std::vector<size_t>> continueInstructions;
+	static thread_local std::stack<std::optional<size_t>> forLoopBreakInstructions;
 
 	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions);
 	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions);
@@ -11633,16 +7980,20 @@ namespace wings {
 	}
 
 	static void CompileExpressionStatement(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& expr = node.Get<stat::Expr>();
+		
+		CompileExpression(expr.expr, instructions);
 
 		Instruction instr{};
-		instr.srcPos = node.expr.srcPos;
+		instr.srcPos = expr.expr.srcPos;
 		instr.type = Instruction::Type::Pop;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileIf(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& ifStat = node.Get<stat::If>();
+		
+		CompileExpression(ifStat.expr, instructions);
 
 		size_t falseJumpInstrIndex = instructions.size();
 		Instruction falseJump{};
@@ -11651,19 +8002,19 @@ namespace wings {
 		falseJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(falseJump));
 
-		CompileBody(node.body, instructions);
+		CompileBody(ifStat.body, instructions);
 
-		if (node.elseClause) {
+		if (ifStat.elseClause) {
 			size_t trueJumpInstrIndex = instructions.size();
 			Instruction trueJump{};
-			trueJump.srcPos = node.elseClause->srcPos;
+			trueJump.srcPos = ifStat.elseClause->srcPos;
 			trueJump.type = Instruction::Type::Jump;
 			trueJump.jump = std::make_unique<JumpInstruction>();
 			instructions.push_back(std::move(trueJump));
 
 			instructions[falseJumpInstrIndex].jump->location = instructions.size();
 
-			CompileBody(node.elseClause->body, instructions);
+			CompileBody(ifStat.elseClause->Get<stat::Else>().body, instructions);
 
 			instructions[trueJumpInstrIndex].jump->location = instructions.size();
 		} else {
@@ -11672,8 +8023,10 @@ namespace wings {
 	}
 
 	static void CompileWhile(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& whileStat = node.Get<stat::While>();
+		
 		size_t conditionLocation = instructions.size();
-		CompileExpression(node.expr, instructions);
+		CompileExpression(whileStat.expr, instructions);
 		
 		size_t terminateJumpInstrIndex = instructions.size();
 		Instruction terminateJump{};
@@ -11684,8 +8037,9 @@ namespace wings {
 
 		breakInstructions.emplace();
 		continueInstructions.emplace();
-
-		CompileBody(node.body, instructions);
+		forLoopBreakInstructions.emplace();
+		
+		CompileBody(whileStat.body, instructions);
 
 		Instruction loopJump{};
 		loopJump.srcPos = node.srcPos;
@@ -11696,27 +8050,40 @@ namespace wings {
 
 		instructions[terminateJumpInstrIndex].jump->location = instructions.size();
 
-		if (node.elseClause) {
-			CompileBody(node.elseClause->body, instructions);
+		if (forLoopBreakInstructions.top()) {
+			instructions[forLoopBreakInstructions.top().value()].queuedJump->location = instructions.size();
+		}
+
+		if (whileStat.elseClause) {
+			CompileBody(whileStat.elseClause->Get<stat::Else>().body, instructions);
 		}
 
 		for (size_t index : breakInstructions.top()) {
-			instructions[index].jump->location = instructions.size();
+			instructions[index].queuedJump->location = instructions.size();
 		}
 		for (size_t index : continueInstructions.top()) {
-			instructions[index].jump->location = conditionLocation;
+			instructions[index].queuedJump->location = conditionLocation;
 		}
+		
 		breakInstructions.pop();
 		continueInstructions.pop();
+		forLoopBreakInstructions.pop();
 	}
 
 	static void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
-		breakInstructions.top().push_back(instructions.size());
+		auto& brk = node.Get<stat::Break>();
+
+		if (brk.exitForLoopNormally) {
+			forLoopBreakInstructions.top() = instructions.size();
+		} else {
+			breakInstructions.top().push_back(instructions.size());
+		}
 
 		Instruction jump{};
 		jump.srcPos = node.srcPos;
-		jump.type = Instruction::Type::Jump;
-		jump.jump = std::make_unique<JumpInstruction>();
+		jump.type = Instruction::Type::QueueJump;
+		jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
+		jump.queuedJump->finallyCount = brk.finallyCount;
 		instructions.push_back(std::move(jump));
 	}
 
@@ -11725,17 +8092,21 @@ namespace wings {
 
 		Instruction jump{};
 		jump.srcPos = node.srcPos;
-		jump.type = Instruction::Type::Jump;
-		jump.jump = std::make_unique<JumpInstruction>();
+		jump.type = Instruction::Type::QueueJump;
+		jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
+		jump.queuedJump->finallyCount = node.Get<stat::Continue>().finallyCount;
 		instructions.push_back(std::move(jump));
 	}
 
 	static void CompileReturn(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& ret = node.Get<stat::Return>();
+		CompileExpression(ret.expr, instructions);
 
 		Instruction in{};
 		in.srcPos = node.srcPos;
 		in.type = Instruction::Type::Return;
+		in.queuedJump = std::make_unique<QueuedJumpInstruction>();
+		in.queuedJump->finallyCount = ret.finallyCount;
 		instructions.push_back(std::move(in));
 	}
 
@@ -11786,14 +8157,15 @@ namespace wings {
 	}
 
 	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileFunction(node.expr, instructions);
+		auto& def = node.Get<stat::Def>().expr;
+		CompileFunction(def, instructions);
 
 		Instruction assign{};
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->assignTarget.type = AssignType::Direct;
-		assign.directAssign->assignTarget.direct = node.expr.def.name;
+		assign.directAssign->assignTarget.direct = def.def.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};
@@ -11803,7 +8175,8 @@ namespace wings {
 	}
 
 	static void CompileClass(const Statement& node, std::vector<Instruction>& instructions) {
-		for (const auto& child : node.body) {
+		auto& klass = node.Get<stat::Class>();
+		for (const auto& child :klass .body) {
 			CompileDef(child, instructions);
 			instructions.pop_back();
 			instructions.pop_back();
@@ -11815,24 +8188,24 @@ namespace wings {
 		argFrame.type = Instruction::Type::PushArgFrame;
 		instructions.push_back(std::move(argFrame));
 
-		for (const auto& base : node.klass.bases) {
+		for (const auto& base : klass.bases) {
 			CompileExpression(base, instructions);
 		}
 
-		Instruction klass{};
-		klass.srcPos = node.srcPos;
-		klass.type = Instruction::Type::Class;
-		klass.klass = std::make_unique<ClassInstruction>();
-		klass.klass->methodNames = node.klass.methodNames;
-		klass.klass->prettyName = node.klass.name;
-		instructions.push_back(std::move(klass));
+		Instruction klassCreate{};
+		klassCreate.srcPos = node.srcPos;
+		klassCreate.type = Instruction::Type::Class;
+		klassCreate.klass = std::make_unique<ClassInstruction>();
+		klassCreate.klass->methodNames = klass.methodNames;
+		klassCreate.klass->prettyName = klass.name;
+		instructions.push_back(std::move(klassCreate));
 
 		Instruction assign{};
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->assignTarget.type = AssignType::Direct;
-		assign.directAssign->assignTarget.direct = node.klass.name;
+		assign.directAssign->assignTarget.direct = klass.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};
@@ -11842,28 +8215,30 @@ namespace wings {
 	}
 
 	static void CompileImportFrom(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& importFrom = node.Get<stat::ImportFrom>();
 		Instruction instr{};
 		instr.srcPos = node.srcPos;
 		instr.type = Instruction::Type::ImportFrom;
 		instr.importFrom = std::make_unique<ImportFromInstruction>();
-		instr.importFrom->module = node.importFrom.module;
-		instr.importFrom->names = node.importFrom.names;
-		instr.importFrom->alias = node.importFrom.alias;
+		instr.importFrom->module = importFrom.module;
+		instr.importFrom->names = importFrom.names;
+		instr.importFrom->alias = importFrom.alias;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileImport(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& import = node.Get<stat::Import>();
 		Instruction instr{};
 		instr.srcPos = node.srcPos;
 		instr.type = Instruction::Type::Import;
 		instr.import = std::make_unique<ImportInstruction>();
-		instr.import->module = node.import.module;
-		instr.import->alias = node.import.alias;
+		instr.import->module = import.module;
+		instr.import->alias = import.alias;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileRaise(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		CompileExpression(node.Get<stat::Raise>().expr, instructions);
 
 		Instruction raise{};
 		raise.srcPos = node.srcPos;
@@ -11873,27 +8248,37 @@ namespace wings {
 
 	static void CompileTry(const Statement& node, std::vector<Instruction>& instructions) {
 		/* 
-		 * Push try
-		 * Try body
-		 * Jump to finally
-		 * Check exception type
-		 * Except body
-		 * Jump to finally
-		 * Finally body
-		 * Pop try
+		 * [Try block]
+		 * Push except location and finally location
+		 * Run try body
+		 * Queue jump to end with 1 finally queued
+		 * 
+		 * [Except block]
+		 * Check exception type. If not match, jump to next except block
+		 * Clear exception
+		 * Run except body
+		 * Queue jump to end with 1 finally queued
+		 * 
+		 * [Finally block]
+		 * Pop except and finally location
+		 * Run finally body
+		 * Jump to next queued finally if it exists or go to queued jump
 		 */
 
-		std::vector<size_t> jumpToFinallyInstructs;
+		auto& tr = node.Get<stat::Try>();
+
+		std::vector<size_t> jumpToEndInstructs;
 		auto jumpToFinally = [&] {
-			jumpToFinallyInstructs.push_back(instructions.size());
-			Instruction tryEnd{};
-			tryEnd.srcPos = node.srcPos;
-			tryEnd.type = Instruction::Type::Jump;
-			tryEnd.jump = std::make_unique<JumpInstruction>();
-			instructions.push_back(std::move(tryEnd));
+			jumpToEndInstructs.push_back(instructions.size());
+			Instruction jump{};
+			jump.srcPos = instructions.back().srcPos;
+			jump.type = Instruction::Type::QueueJump;
+			jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
+			jump.queuedJump->finallyCount = 1;
+			instructions.push_back(std::move(jump));
 		};
-
-
+		
+		// Try block
 		size_t pushTryIndex = instructions.size();
 		Instruction pushTry{};
 		pushTry.srcPos = node.srcPos;
@@ -11901,14 +8286,18 @@ namespace wings {
 		pushTry.pushTry = std::make_unique<TryFrameInstruction>();
 		instructions.push_back(std::move(pushTry));
 
-		CompileBody(node.body, instructions);
+		CompileBody(tr.body, instructions);
 
 		jumpToFinally();
 
+		// Except blocks		
 		instructions[pushTryIndex].pushTry->exceptJump = instructions.size();
-		for (const auto& exceptClause : node.tryBlock.exceptClauses) {
+		for (const auto& exceptClause : tr.exceptBlocks) {
+			auto& except = exceptClause.Get<stat::Except>();
 			std::optional<size_t> jumpToNextExceptIndex;
-			if (exceptClause.exceptBlock.exceptType.has_value()) {
+			
+			// Check exception type
+			if (except.type) {
 				Instruction argFrame{};
 				argFrame.srcPos = exceptClause.srcPos;
 				argFrame.type = Instruction::Type::PushArgFrame;
@@ -11924,7 +8313,7 @@ namespace wings {
 				curExcept.type = Instruction::Type::CurrentException;
 				instructions.push_back(std::move(curExcept));
 
-				CompileExpression(exceptClause.exceptBlock.exceptType.value(), instructions);
+				CompileExpression(except.type.value(), instructions);
 
 				Instruction call{};
 				call.srcPos = exceptClause.srcPos;
@@ -11938,7 +8327,8 @@ namespace wings {
 				jumpToNextExcept.jump = std::make_unique<JumpInstruction>();
 				instructions.push_back(std::move(jumpToNextExcept));
 
-				if (!exceptClause.exceptBlock.var.empty()) {
+				// Assign exception to variable
+				if (!except.variable.empty()) {
 					Instruction curExcept{};
 					curExcept.srcPos = exceptClause.srcPos;
 					curExcept.type = Instruction::Type::CurrentException;
@@ -11949,7 +8339,7 @@ namespace wings {
 					assign.type = Instruction::Type::DirectAssign;
 					assign.directAssign = std::make_unique<DirectAssignInstruction>();
 					assign.directAssign->assignTarget.type = AssignType::Direct;
-					assign.directAssign->assignTarget.direct = exceptClause.exceptBlock.var;
+					assign.directAssign->assignTarget.direct = except.variable;
 					instructions.push_back(std::move(assign));
 
 					Instruction pop{};
@@ -11959,12 +8349,12 @@ namespace wings {
 				}
 			}
 
-			Instruction except{};
-			except.srcPos = exceptClause.srcPos;
-			except.type = Instruction::Type::Except;
-			instructions.push_back(std::move(except));
+			Instruction exc{};
+			exc.srcPos = exceptClause.srcPos;
+			exc.type = Instruction::Type::ClearException;
+			instructions.push_back(std::move(exc));
 
-			CompileBody(exceptClause.body, instructions);
+			CompileBody(except.body, instructions);
 
 			jumpToFinally();
 
@@ -11972,43 +8362,50 @@ namespace wings {
 				instructions[jumpToNextExceptIndex.value()].jump->location = instructions.size();
 			}
 		}
-		
-		instructions[pushTryIndex].pushTry->finallyJump = instructions.size();
-		for (size_t instrIndex : jumpToFinallyInstructs) {
-			instructions[instrIndex].jump->location = instructions.size();
-		}
 
-		CompileBody(node.tryBlock.finallyClause, instructions);
-		
+		// Finally block
+		instructions[pushTryIndex].pushTry->finallyJump = instructions.size();
+
 		Instruction popTry{};
 		popTry.srcPos = node.srcPos;
 		popTry.type = Instruction::Type::PopTry;
 		popTry.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(popTry));
+
+		CompileBody(tr.finallyBody, instructions);
+
+		Instruction endFinally{};
+		endFinally.srcPos = node.srcPos;
+		endFinally.type = Instruction::Type::EndFinally;
+		instructions.push_back(std::move(endFinally));
+
+		for (size_t instrIndex : jumpToEndInstructs) {
+			instructions[instrIndex].queuedJump->location = instructions.size();
+		}
 	}
 
 	using CompileFn = void(*)(const Statement&, std::vector<Instruction>&);
 
-	static const std::unordered_map<Statement::Type, CompileFn> COMPILE_FUNCTIONS = {
-		{ Statement::Type::Expr, CompileExpressionStatement },
-		{ Statement::Type::If, CompileIf },
-		{ Statement::Type::While, CompileWhile },
-		{ Statement::Type::Break, CompileBreak },
-		{ Statement::Type::Continue, CompileContinue },
-		{ Statement::Type::Return, CompileReturn },
-		{ Statement::Type::Def, CompileDef },
-		{ Statement::Type::Class, CompileClass },
-		{ Statement::Type::Try, CompileTry },
-		{ Statement::Type::Raise, CompileRaise },
-		{ Statement::Type::Import, CompileImport },
-		{ Statement::Type::ImportFrom, CompileImportFrom },
-		{ Statement::Type::Pass, [](auto, auto) {}},
-		{ Statement::Type::Global, [](auto, auto) {}},
-		{ Statement::Type::Nonlocal, [](auto, auto) {}},
+	static const std::unordered_map<size_t, CompileFn> COMPILE_FUNCTIONS = {
+		{ StatIndex<stat::Expr>(), CompileExpressionStatement },
+		{ StatIndex<stat::If>(), CompileIf },
+		{ StatIndex<stat::While>(), CompileWhile },
+		{ StatIndex<stat::Break>(), CompileBreak },
+		{ StatIndex<stat::Continue>(), CompileContinue },
+		{ StatIndex<stat::Return>(), CompileReturn },
+		{ StatIndex<stat::Def>(), CompileDef },
+		{ StatIndex<stat::Class>(), CompileClass },
+		{ StatIndex<stat::Try>(), CompileTry },
+		{ StatIndex<stat::Raise>(), CompileRaise },
+		{ StatIndex<stat::Import>(), CompileImport },
+		{ StatIndex<stat::ImportFrom>(), CompileImportFrom },
+		{ StatIndex<stat::Pass>(), [](auto, auto) {}},
+		{ StatIndex<stat::Global>(), [](auto, auto) {}},
+		{ StatIndex<stat::NonLocal>(), [](auto, auto) {}},
 	};
 
 	static void CompileStatement(const Statement& node, std::vector<Instruction>& instructions) {
-		COMPILE_FUNCTIONS.at(node.type)(node, instructions);
+		COMPILE_FUNCTIONS.at(node.data.index())(node, instructions);
 	}
 
 	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions) {
@@ -12017,7 +8414,7 @@ namespace wings {
 		}
 	}
 
-	std::vector<Instruction> Compile(const Statement& parseTree) {
+	std::vector<Instruction> Compile(const stat::Root& parseTree) {
 		std::vector<Instruction> instructions;
 		CompileBody(parseTree.expr.def.body, instructions);
 
@@ -12028,204 +8425,238 @@ namespace wings {
 
 
 namespace wings {
-	namespace sysmodule {
-		static Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
-			Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
-			return nullptr;
-		}
-	}
-	
-	bool ImportSys(Wg_Context* context) {
-		using namespace sysmodule;
-		try {
-			RegisterFunction(context, "exit", exit);
-			Wg_SetGlobal(context, "argv", context->argv);
-			return true;
-		} catch (LibraryInitException&) {
-			return false;
-		}
-	}
+	bool ImportDis(Wg_Context* context);
 }
 
 
-#include <cstdlib>
-#include <filesystem>
+#include <queue>
 
 namespace wings {
-	namespace osmodule {
-		namespace fs = std::filesystem;
+	namespace dismodule {
+		static std::string AssignTargetToString(const AssignTarget& target) {
+			if (target.type == AssignType::Direct) {
+				return target.direct;
+			} else {
+				std::string s = "(";
+				for (const auto& child : target.pack) {
+					s += AssignTargetToString(child);
+					s += ", ";
+				}
+				s.pop_back();
+				s.pop_back();
+				return s;
+			}
+		}
 
-		static Wg_Obj* system(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static std::string LiteralToString(const LiteralInstruction& literal) {
+			if (std::holds_alternative<std::nullptr_t>(literal)) {
+				return "None";
+			} else if (std::holds_alternative<bool>(literal)) {
+				return std::get<bool>(literal) ? "True" : "False";
+			} else if (std::holds_alternative<Wg_int>(literal)) {
+				return std::to_string(std::get<Wg_int>(literal));
+			} else if (std::holds_alternative<Wg_float>(literal)) {
+				return std::to_string(std::get<Wg_float>(literal));
+			} else if (std::holds_alternative<std::string>(literal)) {
+				return "\"" + std::get<std::string>(literal) + "\"";
+			} else {
+				WG_UNREACHABLE();
+			}
+		}
+
+		static std::string PadLeft(size_t i, size_t size) {
+			auto n = std::to_string(i);
+			while (n.size() < size)
+				n.insert(0, 1, ' ');
+			return n;
+		}
+
+		static Wg_Obj* dis(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_STRING(0);
-			int ec = std::system(Wg_GetString(argv[0]));
-			return Wg_NewInt(context, (Wg_int)ec);
-		}
+			WG_EXPECT_ARG_TYPE_FUNC(0);
 
-		static Wg_Obj* mkdir(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_STRING(0);
-			const char* path = Wg_GetString(argv[0]);
-			std::error_code ec{};
-			if (!fs::create_directory(path, ec)) {
-				Wg_RaiseException(context, WG_EXC_OSERROR);
+			const auto& fn = argv[0]->Get<Wg_Obj::Func>();
+			if (fn.fptr != &DefObject::Run) {
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Cannot disassemble native function");
 				return nullptr;
 			}
+
+			struct Func {
+				const std::vector<Instruction>* instructions;
+				std::string_view name;
+			};
+
+			std::queue<Func> functions;
+			DefObject* def = (DefObject*)fn.userdata;
+			functions.push(Func{ &*def->instructions, def->prettyName });
+
+			std::string s;
+			while (!functions.empty()) {
+				s += "Function ";
+				s += functions.front().name;
+				s += "()\n";
+				const auto* instructions = functions.front().instructions;
+				functions.pop();
+
+				for (size_t i = 0; i < instructions->size(); i++) {
+					const Instruction& instr = (*instructions)[i];
+
+					if (i == 0 || instr.srcPos.line != (*instructions)[i - 1].srcPos.line) {
+						if (i)
+							s += "\n";
+						s += PadLeft(instr.srcPos.line + 1, 6) + " ";
+					} else {
+						s += "       ";
+					}
+					s += PadLeft(i, 4) + " ";
+
+					switch (instr.type) {
+					case Instruction::Type::DirectAssign:
+						if (instr.directAssign->assignTarget.type == AssignType::Direct) {
+							s += "ASSIGN\t\t";
+						} else {
+							s += "ASSIGN_PACK\t\t";
+						}
+						s += AssignTargetToString(instr.directAssign->assignTarget);
+						break;
+					case Instruction::Type::MemberAssign:
+						s += "ASSIGN_ATTR\t\t" + instr.string->string;
+						break;
+					case Instruction::Type::Literal:
+						s += "LOAD_CONST\t\t" + LiteralToString(*instr.literal);
+						break;
+					case Instruction::Type::Call:
+						s += "CALL";
+						break;
+					case Instruction::Type::Return:
+						s += "RETURN";
+						break;
+					case Instruction::Type::Pop:
+						s += "POP";
+						break;
+					case Instruction::Type::PushArgFrame:
+						s += "BEGIN_ARGS";
+						break;
+					case Instruction::Type::Dot:
+						s += "GET_ATTR\t\t" + instr.string->string;
+						break;
+					case Instruction::Type::Variable:
+						s += "LOAD_VAR\t\t" + instr.string->string;
+						break;
+					case Instruction::Type::Jump:
+						s += "JUMP\t\tto " + std::to_string(instr.jump->location);
+						break;
+					case Instruction::Type::JumpIfFalsePop:
+						s += "JUMP_IF_FALSE_POP\tto " + std::to_string(instr.jump->location);
+						break;
+					case Instruction::Type::JumpIfFalse:
+						s += "JUMP_IF_FALSE\tto " + std::to_string(instr.jump->location);
+						break;
+					case Instruction::Type::JumpIfTrue:
+						s += "JUMP_IF_TRUE\tto " + std::to_string(instr.jump->location);
+						break;
+					case Instruction::Type::List:
+						s += "MAKE_LIST";
+						break;
+					case Instruction::Type::Tuple:
+						s += "MAKE_TUPLE";
+						break;
+					case Instruction::Type::Map:
+						s += "MAKE_DICT";
+						break;
+					case Instruction::Type::Set:
+						s += "MAKE_SET";
+						break;
+					case Instruction::Type::Slice:
+						s += "MAKE_SLICE";
+						break;
+					case Instruction::Type::Raise:
+						s += "RAISE";
+						break;
+					case Instruction::Type::PushTry:
+						s += "BEGIN_TRY\t\t" + std::to_string(instr.pushTry->exceptJump)
+							+ ", " + std::to_string(instr.pushTry->finallyJump);
+						break;
+					case Instruction::Type::PopTry:
+						s += "END_TRY";
+						break;
+					case Instruction::Type::CurrentException:
+						s += "LOAD_CUR_EXCEPT";
+						break;
+					case Instruction::Type::IsInstance:
+						s += "LOAD_IS_INSTANCE";
+						break;
+					case Instruction::Type::Import:
+						s += "IMPORT\t\t" + instr.import->module;
+						if (!instr.import->alias.empty())
+							s += " as " + instr.import->alias;
+						break;
+					case Instruction::Type::ImportFrom:
+						if (instr.importFrom->names.empty()) {
+							s += "IMPORT_ALL\t\t" + instr.importFrom->module;
+						} else if (!instr.importFrom->alias.empty()) {
+							s += "IMPORT_FROM\t\tfrom " + instr.importFrom->module
+								+ " import " + instr.importFrom->names[0]
+								+ " as " + instr.importFrom->alias;
+						} else {
+							s += "IMPORT_FROM\t\tfrom " + instr.importFrom->module + " import ";
+							for (const auto& name : instr.importFrom->names) {
+								s += name + ", ";
+							}
+							s.pop_back();
+							s.pop_back();
+						}
+						break;
+					case Instruction::Type::Is:
+						s += "IS";
+						break;
+					case Instruction::Type::PushKwarg:
+						s += "PUSH_KWARG";
+						break;
+					case Instruction::Type::UnpackMapForCall:
+						s += "UNPACK_KWARGS";
+						break;
+					case Instruction::Type::UnpackMapForMapCreation:
+						s += "UNPACK_DICT";
+						break;
+					case Instruction::Type::Unpack:
+						s += "UNPACK_ITERABLE";
+						break;
+					case Instruction::Type::Class:
+						s += "MAKE_CLASS\t\t" + instr.klass->prettyName + " [";
+						for (const auto& name : instr.klass->methodNames) {
+							s += name + ", ";
+						}
+						s.pop_back();
+						s.pop_back();
+						s += "]";
+						break;
+					case Instruction::Type::Def:
+						s += "MAKE_FUNCTION\t" + instr.def->prettyName;
+
+						functions.push(Func{ &*instr.def->instructions, instr.def->prettyName });
+						break;
+					default:
+						s += "???";
+						break;
+					}
+
+					s += "\n";
+				}
+
+				s += "\n";
+			}
+
+			Wg_Print(context, s.c_str(), (int)s.size());
+
 			return Wg_None(context);
-		}
-
-		static Wg_Obj* makedirs(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_STRING(0);
-			const char* path = Wg_GetString(argv[0]);
-			std::error_code ec{};
-			if (!fs::create_directories(path, ec)) {
-				Wg_RaiseException(context, WG_EXC_OSERROR);
-				return nullptr;
-			}
-			return Wg_None(context);
-		}
-
-		static Wg_Obj* remove(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_STRING(0);
-			const char* path = Wg_GetString(argv[0]);
-
-			std::error_code ec{};
-			if (!fs::is_regular_file(path, ec)) {
-				Wg_RaiseException(context, WG_EXC_ISADIRECTORYERROR);
-				return nullptr;
-			}
-
-			if (!fs::remove(path, ec)) {
-				Wg_RaiseException(context, WG_EXC_OSERROR);
-				return nullptr;
-			}
-
-			return Wg_None(context);
-		}
-
-		static Wg_Obj* rmdir(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_STRING(0);
-			const char* path = Wg_GetString(argv[0]);
-
-			std::error_code ec{};
-			if (!fs::is_directory(path, ec)) {
-				Wg_RaiseException(context, WG_EXC_OSERROR);
-				return nullptr;
-			}
-
-			if (!fs::remove(path, ec)) {
-				Wg_RaiseException(context, WG_EXC_OSERROR);
-				return nullptr;
-			}
-
-			return Wg_None(context);
-		}
-
-		static Wg_Obj* rename(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(2);
-			WG_EXPECT_ARG_TYPE_STRING(0);
-			WG_EXPECT_ARG_TYPE_STRING(1);
-			const char* src = Wg_GetString(argv[0]);
-			const char* dst = Wg_GetString(argv[1]);
-
-			std::error_code ec{};
-			fs::rename(src, dst, ec);
-			if (ec) {
-				Wg_RaiseException(context, WG_EXC_OSERROR);
-				return nullptr;
-			}
-
-			return Wg_None(context);
-		}
-
-		static Wg_Obj* listdir(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT_BETWEEN(0, 1);
-			const char* path = ".";
-			if (argc == 1) {
-				WG_EXPECT_ARG_TYPE_STRING(0);
-				path = Wg_GetString(argv[0]);
-			}
-
-			std::error_code ec{};
-			std::vector<fs::path> paths;
-			for (const auto& entry : std::filesystem::directory_iterator(path, ec)) {
-				paths.push_back(entry.path());
-			}
-
-			if (ec) {
-				Wg_RaiseException(context, WG_EXC_OSERROR);
-				return nullptr;
-			}
-
-			Wg_Obj* list = Wg_NewList(context);
-			if (list == nullptr)
-				return nullptr;
-			Wg_ObjRef ref(list);
-
-			for (const auto& path : paths) {
-				Wg_Obj* entry = Wg_NewString(context, path.string().c_str());
-				if (entry == nullptr)
-					return nullptr;
-				if (Wg_CallMethod(list, "append", &entry, 1) == nullptr)
-					return nullptr;
-			}
-
-			return list;
-		}
-
-		static Wg_Obj* abort(Wg_Context* context, Wg_Obj**, int argc) {
-			WG_EXPECT_ARG_COUNT(0);
-			std::abort();
-		}
-
-		static Wg_Obj* chdir(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_STRING(0);
-			const char* path = Wg_GetString(argv[0]);
-
-			std::error_code ec{};
-			fs::current_path(path, ec);
-			if (ec) {
-				Wg_RaiseException(context, WG_EXC_OSERROR);
-				return nullptr;
-			}
-
-			return Wg_None(context);
-		}
-
-		static Wg_Obj* getcwd(Wg_Context* context, Wg_Obj**, int argc) {
-			WG_EXPECT_ARG_COUNT(0);
-			auto path = fs::current_path().string();
-			return Wg_NewString(context, path.c_str());
 		}
 	}
 
-	bool ImportOS(Wg_Context* context) {
-		using namespace osmodule;
+	bool ImportDis(Wg_Context* context) {
+		using namespace dismodule;
 		try {
-			RegisterFunction(context, "system", system);
-			RegisterFunction(context, "chdir", chdir);
-			RegisterFunction(context, "getcwd", getcwd);
-			RegisterFunction(context, "mkdir", mkdir);
-			RegisterFunction(context, "makedirs", makedirs);
-			RegisterFunction(context, "remove", remove);
-			RegisterFunction(context, "rmdir", rmdir);
-			RegisterFunction(context, "rename", rename);
-			RegisterFunction(context, "listdir", listdir);
-			RegisterFunction(context, "abort", abort);
-			
-			Wg_SetGlobal(context, "error", Wg_GetGlobal(context, "OSError"));
-
-#ifdef _WIN32
-			RegisterConstant(context, "sep", Wg_NewString, "\\");
-			RegisterConstant(context, "linesep", Wg_NewString, "\r\n");
-#else
-			RegisterConstant(context, "sep", Wg_NewString, "/");
-			RegisterConstant(context, "linesep", Wg_NewString, "\r");
-#endif
+			RegisterFunction(context, "dis", dis);
 			return true;
 		} catch (LibraryInitException&) {
 			return false;
@@ -12468,71 +8899,63 @@ namespace wings {
 
 			DoInstruction(instr);
 
-			if (!exitValue.has_value())
-				continue;
+			if (Wg_GetException(context)) {
+				// No handlers so propagate
+				if (tryFrames.empty()) {
+					return nullptr;
+				}
 
-			// Return normally
-			if (exitValue.value() != nullptr)
-				break;
-
-			// New exception thrown
-			if (tryFrames.empty()) {
-				// No handlers. Propagate to next function.
-				break;
-			}
-			
-			PopStackUntil(tryFrames.top().stackSize);
-			if (tryFrames.top().isHandlingException) {
-				// Was already handling an exception. Jump to finally.
-				pc = tryFrames.top().finallyJump - 1;
-				exitValue.reset();
-			} else {
-				// Jump to handler
-				pc = tryFrames.top().exceptJump - 1;
-				tryFrames.top().isHandlingException = true;
-				exitValue.reset();
+				storedException = Wg_GetException(context);
+				Wg_ClearException(context);
+				PopStackUntil(tryFrames.back().stackSize);
+				
+				auto& back = tryFrames.back();
+				if (!back.exceptTaken) {
+					// Jump to except block
+					pc = back.exceptJump - 1;
+					back.exceptTaken = true;
+				} else {
+					// Another exception occurred while handling exception.
+					// Jump to finally block
+					queuedFinallyCount = 1;
+					DequeueJump();
+				}
 			}
 		}
 
-		ClearStack();
-
-		if (exitValue.has_value()) {
-			return exitValue.value();
-		} else {
-			return Wg_None(context);
-		}
+		return returnValue ? returnValue : Wg_None(context);
 	}
 
 	void Executor::DoInstruction(const Instruction& instr) {
 		switch (instr.type) {
 		case Instruction::Type::Jump:
 			pc = instr.jump->location - 1;
-			break;
+			return;
 		case Instruction::Type::JumpIfFalsePop:
 			if (Wg_Obj* truthy = Wg_UnaryOp(WG_UOP_BOOL, PopStack())) {
 				if (!Wg_GetBool(truthy)) {
 					pc = instr.jump->location - 1;
 				}
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		case Instruction::Type::JumpIfFalse:
 		case Instruction::Type::JumpIfTrue:
 			if (Wg_Obj* truthy = Wg_UnaryOp(WG_UOP_BOOL, PeekStack())) {
 				if (Wg_GetBool(truthy) == (instr.type == Instruction::Type::JumpIfTrue)) {
 					pc = instr.jump->location - 1;
 				}
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		case Instruction::Type::Pop:
 			PopStack();
-			break;
+			return;
 		case Instruction::Type::Return:
-			exitValue = PopStack();
-			break;
+			storedException = nullptr;
+			queuedFinallyCount = instr.queuedJump->finallyCount;
+			queuedJump = def->instructions->size();
+			returnValue = PopStack();
+			DequeueJump();
+			return;
 		case Instruction::Type::Def: {
 			DefObject* def = new DefObject();
 			def->context = context;
@@ -12569,7 +8992,6 @@ namespace wings {
 			Wg_Obj* obj = Wg_NewFunction(context, &DefObject::Run, def, instr.def->prettyName.c_str());
 			if (obj == nullptr) {
 				delete def;
-				exitValue = nullptr;
 				return;
 			}
 			obj->Get<Wg_Obj::Func>().isMethod = instr.def->isMethod;
@@ -12577,7 +8999,7 @@ namespace wings {
 			Wg_RegisterFinalizer(obj, [](void* userdata) { delete (DefObject*)userdata; }, def);
 
 			PushStack(obj);
-			break;
+			return;
 		}
 		case Instruction::Type::Class: {
 			size_t methodCount = instr.klass->methodNames.size();
@@ -12592,10 +9014,8 @@ namespace wings {
 			Wg_Obj** methods = stackEnd - methodCount - baseCount;
 
 			Wg_Obj* klass = Wg_NewClass(context, instr.klass->prettyName.c_str(), bases, (int)baseCount);
-			if (klass == nullptr) {
-				exitValue = nullptr;
+			if (klass == nullptr)
 				return;
-			}
 
 			for (size_t i = 0; i < methodCount; i++)
 				AddAttributeToClass(klass, instr.klass->methodNames[i].c_str(), methods[i]);
@@ -12603,12 +9023,10 @@ namespace wings {
 			for (size_t i = 0; i < methodCount + baseCount; i++)
 				PopStack();
 
-			if (klass == nullptr) {
-				exitValue = nullptr;
-			} else {
+			if (klass) {
 				PushStack(klass);
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::Literal: {
 			Wg_Obj* value{};
@@ -12628,10 +9046,8 @@ namespace wings {
 
 			if (value) {
 				PushStack(value);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::Tuple:
 		case Instruction::Type::List:
@@ -12648,10 +9064,8 @@ namespace wings {
 				for (size_t i = 0; i < argc; i++)
 					PopStack();
 				PushStack(li);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::Map:
 			if (Wg_Obj* dict = Wg_NewDictionary(context)) {
@@ -12664,7 +9078,6 @@ namespace wings {
 					try {
 						dict->Get<WDict>()[key] = val;
 					} catch (HashException&) {
-						exitValue = nullptr;
 						return;
 					}
 				}
@@ -12672,37 +9085,31 @@ namespace wings {
 				for (size_t i = 0; i < argc; i++)
 					PopStack();
 				PushStack(dict);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		case Instruction::Type::Variable:
 			if (Wg_Obj* value = GetVariable(instr.string->string)) {
 				PushStack(value);
 			} else {
 				Wg_RaiseNameError(context, instr.string->string.c_str());
-				exitValue = nullptr;
 			}
-			break;
-		case Instruction::Type::DirectAssign: {
+			return;
+		case Instruction::Type::DirectAssign:
 			if (Wg_Obj* v = DirectAssign(instr.directAssign->assignTarget, PopStack())) {
 				PushStack(v);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
-		}
+			return;
 		case Instruction::Type::MemberAssign: {
 			Wg_Obj* value = PopStack();
 			Wg_Obj* obj = PopStack();
 			Wg_SetAttribute(obj, instr.string->string.c_str(), value);
 			PushStack(value);
-			break;
+			return;
 		}
 		case Instruction::Type::PushArgFrame:
 			argFrames.push(stack.size());
 			kwargsStack.push_back({});
-			break;
+			return;
 		case Instruction::Type::Call: {
 			size_t kwargc = kwargsStack.back().size();
 			size_t argc = stack.size() - argFrames.top() - kwargc - 1;
@@ -12714,50 +9121,34 @@ namespace wings {
 			Wg_Obj* kwargs = nullptr;
 			if (kwargc) {
 				kwargs = Wg_NewDictionary(context, kwargsStack.back().data(), kwargsv, (int)kwargc);
-				if (kwargs == nullptr) {
-					exitValue = nullptr;
+				if (kwargs == nullptr)
 					return;
-				}
 			}
 
 			if (Wg_Obj* ret = Wg_Call(fn, args, (int)argc, kwargs)) {
 				for (size_t i = 0; i < argc + kwargc + 1; i++)
 					PopStack();
 				PushStack(ret);
-			} else {
-				exitValue = nullptr;
 			}
 			PopArgFrame();
-			break;
+			return;
 		}
-		case Instruction::Type::Dot: {
-			Wg_Obj* obj = PopStack();
-			if (Wg_Obj* attr = Wg_GetAttribute(obj, instr.string->string.c_str())) {
+		case Instruction::Type::Dot:
+			if (Wg_Obj* attr = Wg_GetAttribute(PopStack(), instr.string->string.c_str())) {
 				PushStack(attr);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
-		}
-		case Instruction::Type::Unpack: {
-			Wg_Obj* iterable = PopStack();
-
-			auto f = [](Wg_Obj* value, void* userdata) {
+			return;
+		case Instruction::Type::Unpack:
+			Wg_Iterate(PopStack(), this, [](Wg_Obj* value, void* userdata) {
 				Executor* executor = (Executor*)userdata;
 				executor->PushStack(value);
 				return true;
-			};
-
-			if (!Wg_Iterate(iterable, this, f)) {
-				exitValue = nullptr;
-			}
-			break;
-		}
+			});
+			return;
 		case Instruction::Type::UnpackMapForMapCreation: {
 			Wg_Obj* map = PopStack();
 			if (!Wg_IsDictionary(map)) {
 				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Unary '**' must be applied to a dictionary");
-				exitValue = nullptr;
 				return;
 			}
 
@@ -12765,47 +9156,41 @@ namespace wings {
 				PushStack(key);
 				PushStack(value);
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::UnpackMapForCall: {
 			Wg_Obj* map = PopStack();
 			if (!Wg_IsDictionary(map)) {
 				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Unary '**' must be applied to a dictionary");
-				exitValue = nullptr;
 				return;
 			}
 
 			for (const auto& [key, value] : map->Get<WDict>()) {
 				if (!Wg_IsString(key)) {
 					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keywords must be strings");
-					exitValue = nullptr;
 					return;
 				}
 				kwargsStack.back().push_back(key);
 				PushStack(value);
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::PushKwarg:
 			kwargsStack.back().push_back(PopStack());
-			break;
+			return;
 		case Instruction::Type::Not: {
 			Wg_Obj* arg = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
-			if (arg == nullptr) {
-				exitValue = nullptr;
-				break;
-			}
+			if (arg == nullptr)
+				return;
 
 			if (Wg_Obj* value = Wg_NewBool(context, !Wg_GetBool(arg))) {
 				PushStack(value);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::Is:
 			PushStack(Wg_NewBool(context, PopStack() == PopStack()));
-			break;
+			return;
 		case Instruction::Type::Raise: {
 			Wg_Obj* expr = PopStack();
 			if (Wg_IsClass(expr)) {
@@ -12813,37 +9198,48 @@ namespace wings {
 			} else {
 				Wg_RaiseExceptionObject(expr);
 			}
-			exitValue = nullptr;
-			break;
+			return;
 		}
 		case Instruction::Type::PushTry:
-			tryFrames.push({
+			tryFrames.push_back({
 				instr.pushTry->exceptJump,
 				instr.pushTry->finallyJump,
+				stack.size(),
 				false,
-				stack.size()
 				});
-			break;
+			return;
 		case Instruction::Type::PopTry:
-			tryFrames.pop();
-			if (Wg_GetException(context))
-				exitValue = nullptr;
-			break;
-		case Instruction::Type::Except:
-			Wg_ClearException(context);
-			break;
+			tryFrames.pop_back();
+			if (queuedFinallyCount > 0) {
+				queuedFinallyCount--;
+			}
+			return;
+		case Instruction::Type::ClearException:
+			storedException = nullptr;
+			return;
 		case Instruction::Type::CurrentException:
-			PushStack(Wg_GetException(context));
-			break;
+			PushStack(storedException);
+			return;
+		case Instruction::Type::QueueJump:
+			storedException = nullptr;
+			queuedFinallyCount = instr.queuedJump->finallyCount;
+			queuedJump = instr.queuedJump->location;
+			DequeueJump();
+			return;
+		case Instruction::Type::EndFinally:
+			if (storedException) {
+				Wg_ReraiseExceptionObject(storedException);
+				storedException = nullptr;
+			}
+			DequeueJump();
+			return;
 		case Instruction::Type::IsInstance:
 			PushStack(context->builtins.isinstance);
-			break;
+			return;
 		case Instruction::Type::Slice: {
 			Wg_Obj* slice = Wg_Call(context->builtins.slice, &context->builtins.none, 1);
-			if (slice == nullptr) {
-				exitValue = nullptr;
-				break;
-			}
+			if (slice == nullptr)
+				return;
 
 			Wg_Obj* step = PopStack();
 			Wg_Obj* stop = PopStack();
@@ -12852,34 +9248,42 @@ namespace wings {
 			Wg_SetAttribute(slice, "stop", stop);
 			Wg_SetAttribute(slice, "start", start);
 			PushStack(slice);
-			break;
+			return;
 		}
 		case Instruction::Type::Import: {
 			const char* alias = instr.import->alias.empty() ? nullptr : instr.import->alias.c_str();
-			if (Wg_ImportModule(context, instr.import->module.c_str(), alias) == nullptr)
-				exitValue = nullptr;
-			break;
+			Wg_ImportModule(context, instr.import->module.c_str(), alias);
+			return;
 		}
 		case Instruction::Type::ImportFrom: {
 			const char* moduleName = instr.importFrom->module.c_str();
 			if (instr.importFrom->names.empty()) {
-				if (!Wg_ImportAllFromModule(context, moduleName))
-					exitValue = nullptr;
+				Wg_ImportAllFromModule(context, moduleName);
 			} else if (!instr.importFrom->alias.empty()) {
-				if (!Wg_ImportFromModule(context, moduleName, instr.importFrom->names[0].c_str(), instr.importFrom->alias.c_str()))
-					exitValue = nullptr;
+				Wg_ImportFromModule(
+					context,
+					moduleName,
+					instr.importFrom->names[0].c_str(),
+					instr.importFrom->alias.c_str()
+				);
 			} else {
-				for (const auto& name : instr.importFrom->names) {
-					if (!Wg_ImportFromModule(context, moduleName, name.c_str())) {
-						exitValue = nullptr;
+				for (const auto& name : instr.importFrom->names)
+					if (!Wg_ImportFromModule(context, moduleName, name.c_str()))
 						break;
-					}
-				}
 			}
-			break;
+			return;
 		}
 		default:
 			WG_UNREACHABLE();
+		}
+	}
+
+	void Executor::DequeueJump() {
+		if (queuedFinallyCount) {
+			pc = tryFrames.back().finallyJump - 1;
+		} else {
+			pc = queuedJump - 1;
+			queuedJump = (size_t)-1;
 		}
 	}
 
@@ -12891,6 +9295,10 @@ namespace wings {
 				refs.push_back(kwarg);
 		for (const auto& val : this->stack)
 			refs.push_back(val);
+		if (storedException)
+			refs.push_back(storedException);
+		if (returnValue)
+			refs.push_back(returnValue);
 	}
 }
 
@@ -13551,19 +9959,23 @@ namespace wings {
 
 		Statement appendStat{};
 		appendStat.srcPos = out.srcPos;
-		appendStat.type = Statement::Type::Expr;
-		appendStat.expr = std::move(appendCall);
+		{
+			stat::Expr expr;
+			expr.expr = std::move(appendCall);
+			appendStat.data = std::move(expr);
+		}
 
 		Statement ifStat{};
 		ifStat.srcPos = out.srcPos;
-		ifStat.type = Statement::Type::If;
-		ifStat.expr = std::move(condition);
-		ifStat.body.push_back(std::move(appendStat));
-
-		Statement forLoop{};
-		forLoop.srcPos = out.srcPos;
-		forLoop.type = Statement::Type::For;
-		forLoop.forLoop.assignTarget = std::move(assignTarget);
+		{
+			stat::If ifStatData;
+			ifStatData.expr = std::move(condition);
+			ifStatData.body.push_back(std::move(appendStat));
+			ifStat.data = std::move(ifStatData);
+		}
+		
+		stat::For forLoop;
+		forLoop.assignTarget = std::move(assignTarget);
 		forLoop.expr = std::move(iterable);
 		forLoop.body.push_back(std::move(ifStat));
 
@@ -13603,8 +10015,11 @@ namespace wings {
 
 		Statement lambdaRet{};
 		lambdaRet.srcPos = out.srcPos;
-		lambdaRet.type = Statement::Type::Return;
-		lambdaRet.expr = std::move(lambdaExpr);
+		{
+			stat::Return ret;
+			ret.expr = std::move(lambdaExpr);
+			lambdaRet.data = std::move(ret);
+		}
 
 		out.operation = Operation::Function;
 		out.def.localCaptures = std::move(captures);
@@ -13810,6 +10225,3965 @@ namespace wings {
 		}
 	}
 }
+
+
+#include <regex>
+#include <optional>
+#include <stack>
+
+namespace wings {
+
+	std::string Token::ToString() const {
+		std::vector<std::pair<std::string, std::string>> props;
+
+		props.push_back({ "text", '"' + text + '"' });
+		props.push_back({ "srcPos", '(' + std::to_string(srcPos.line + 1)
+								  + ',' + std::to_string(srcPos.column + 1) + ')' });
+		switch (type) {
+		case Token::Type::Null:
+			props.push_back({ "type", "null" });
+			break;
+		case Token::Type::Bool:
+			props.push_back({ "type", "bool" });
+			props.push_back({ "value", literal.b ? "True" : "False" });
+			break;
+		case Token::Type::Int:
+			props.push_back({ "type", "int" });
+			props.push_back({ "value", std::to_string(literal.i) });
+			break;
+		case Token::Type::Float:
+			props.push_back({ "type", "float" });
+			props.push_back({ "value", std::to_string(literal.f) });
+			break;
+		case Token::Type::String:
+			props.push_back({ "type", "string" });
+			props.push_back({ "value", literal.s });
+			break;
+		case Token::Type::Symbol:
+			props.push_back({ "type", "symbol" });
+			break;
+		case Token::Type::Word:
+			props.push_back({ "type", "word" });
+			break;
+		default:
+			WG_UNREACHABLE();
+		}
+
+		std::string s = "{ ";
+		for (const auto& p : props)
+			s += p.first + ": " + p.second + ", ";
+		return s + "}";
+	}
+
+	static const std::vector<std::string> SYMBOLS = {
+		"(", ")", "[", "]", "{", "}", ":", ".", ",",
+		"+", "-", "*", "**", "/", "//", "%",
+		"<", ">", "<=", ">=", "==", "!=",
+		"!", "&&", "||", "^", "&", "|", "~", "<<", ">>",
+		"=", ":=",
+		"+=", "-=", "*=", "**=", "%=", "/=", "//=",
+		">>=", "<<=", "|=", "&=", "^=", ";", "--", "++"
+	};
+
+	static std::string NormalizeLineEndings(const std::string& text) {
+		auto s = std::regex_replace(text, std::regex("\r\n"), "\n");
+		std::replace(s.begin(), s.end(), '\r', '\n');
+		return s;
+	}
+
+	static bool IsAlpha(char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+	}
+
+	static bool IsDigit(char c, int base = 10) {
+		switch (base) {
+		case 2: return c >= '0' && c <= '1';
+		case 8: return c >= '0' && c <= '7';
+		case 10: return c >= '0' && c <= '9';
+		case 16: return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+		default: WG_UNREACHABLE();
+		}
+	}
+
+	static int DigitValueOf(char c, int base) {
+		switch (base) {
+		case 2:
+		case 8:
+		case 10:
+			return c - '0';
+		case 16:
+			if (c >= '0' && c <= '9') {
+				return c - '0';
+			} else if (c >= 'a' && c <= 'f') {
+				return c - 'a' + 10;
+			} else {
+				return c - 'A' + 10;
+			}
+		default:
+			WG_UNREACHABLE();
+		}
+	}
+
+	static bool IsAlphaNum(char c) {
+		return IsAlpha(c) || IsDigit(c);
+	}
+
+	static bool IsWhitespace(const std::string& s) {
+		return s.find_first_not_of(" \t") == std::string::npos;
+	}
+
+	static bool IsWhitespaceChar(char c) {
+		return c == ' ' || c == '\t';
+	}
+
+	static void StripComments(std::string& s) {
+		s.erase(
+			std::find(s.begin(), s.end(), '#'),
+			s.end()
+		);
+	}
+
+	static bool IsPossibleSymbol(const std::string& s) {
+		return std::any_of(SYMBOLS.begin(), SYMBOLS.end(), [&](const auto& x) { return x.starts_with(s); });
+	}
+
+	static bool IsPossibleSymbol(char c) {
+		return IsPossibleSymbol(std::string(1, c));
+	}
+
+	static std::vector<std::string> SplitLines(const std::string& s) {
+		std::vector<std::string> v;
+		size_t last = 0;
+		size_t next = 0;
+		while ((next = s.find('\n', last)) != std::string::npos) {
+			v.push_back(s.substr(last, next - last));
+			last = next + 1;
+		}
+		v.push_back(s.substr(last));
+		return v;
+	}
+
+	static int IndentOf(const std::string& line, std::optional<std::string>& indentString, size_t& indent) {
+		size_t i = 0;
+		while (true) {
+			// Reached end of line or comment before any code
+			if (i >= line.size() || line[i] == '#') {
+				indent = 0;
+				return 0;
+			}
+
+			// Reached code
+			if (line[i] != ' ' && line[i] != '\t')
+				break;
+
+			i++;
+		}
+
+		if (i == 0) {
+			// No indent
+			indent = 0;
+			return 0;
+		} else {
+			// Make sure indent is either all spaces or all tabs
+			if (!std::all_of(line.begin(), line.begin() + i, [&](char c) { return c == line[0]; })) {
+				return -1;
+			}
+
+			if (!indentString.has_value()) {
+				// Encountered first indent
+				indentString = line.substr(0, i);
+				indent = 1;
+				return 0;
+			} else {
+				// Make sure indent is consistent with previous indents
+				if (i % indentString.value().size()) {
+					return -1;
+				}
+
+				indent = i / indentString.value().size();
+				return 0;
+			}
+		}
+	}
+
+	using StringIter = const char*;
+
+	static Token ConsumeWord(StringIter& p) {
+		Token t{};
+		for (; *p && IsAlphaNum(*p); ++p) {
+			t.text += *p;
+		}
+		t.type = Token::Type::Word;
+		if (t.text == "None") {
+			t.type = Token::Type::Null;
+		} else if (t.text == "True" || t.text == "False") {
+			t.type = Token::Type::Bool;
+			t.literal.b = t.text[0] == 'T';
+		} else if (IsKeyword(t.text)) {
+			t.type = Token::Type::Keyword;
+		}
+		return t;
+	}
+
+	static CodeError ConsumeNumber(StringIter& p, Token& out) {
+		StringIter start = p;
+
+		Token t{};
+		int base = 10;
+		if (*p == '0') {
+			switch (p[1]) {
+			case 'b': case 'B': base = 2; break;
+			case 'o': case 'O': base = 8; break;
+			case 'x': case 'X': base = 16; break;
+			}
+		}
+
+		if (base != 10) {
+			t.text += p[0];
+			t.text += p[1];
+			p += 2;
+
+			if (!IsDigit(*p, base) && *p != '.') {
+				switch (base) {
+				case 2: return CodeError::Bad("Invalid binary string");
+				case 8: return CodeError::Bad("Invalid octal string");
+				case 16: return CodeError::Bad("Invalid hexadecimal string");
+				default: WG_UNREACHABLE();
+				}
+			}
+		}
+
+		uintmax_t value = 0;
+		for (; *p && IsDigit(*p, base); ++p) {
+			value = (base * value) + DigitValueOf(*p, base);
+		}
+
+		if (*p == '.') {
+			// Is a float
+			++p;
+			Wg_float fvalue = (Wg_float)value;
+			for (int i = 1; *p && IsDigit(*p, base); ++p, ++i) {
+				fvalue += DigitValueOf(*p, base) * std::pow((Wg_float)base, (Wg_float)-i);
+			}
+			t.literal.f = fvalue;
+			t.type = Token::Type::Float;
+		} else {
+			// Is an int
+			if (value > std::numeric_limits<Wg_uint>::max()) {
+				return CodeError::Bad("Integer literal is too large");
+			}
+			Wg_uint u = (Wg_uint)value;
+			static_assert(sizeof(t.literal.i) == sizeof(u));
+			std::memcpy(&t.literal.i, &u, sizeof(u));
+			t.type = Token::Type::Int;
+		}
+
+		if (IsAlphaNum(*p)) {
+			return CodeError::Bad("Invalid numerical literal");
+		}
+
+		t.text = std::string(start, p);
+		out = std::move(t);
+		return CodeError::Good();
+	}
+
+	static bool IsHexDigit(char c, int& val) {
+		if (c >= '0' && c <= '9') {
+			val = c - '0';
+			return true;
+		} else if (c >= 'a' && c <= 'f') {
+			val = c - 'a' + 10;
+			return true;
+		} else if (c >= 'A' && c <= 'F') {
+			val = c - 'A' + 10;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	static CodeError ConsumeString(StringIter& p, Token& out) {
+		char quote = *p;
+		++p;
+
+		Token t{};
+		for (; *p && *p != quote; ++p) {
+			t.text += *p;
+
+			// Escape sequences
+			if (*p == '\\') {
+				++p;
+				if (*p == '\0') {
+					return CodeError::Bad("Missing closing quote");
+				}
+
+				if (*p == 'x') {
+					++p;
+					int	d1 = 0;
+					if (!IsHexDigit(*p, d1)) {
+						return CodeError::Bad("Invalid hex escape sequence");
+					}
+					t.text += *p;
+					
+					++p;
+					int d2 = 0;
+					if (!IsHexDigit(*p, d2)) {
+						return CodeError::Bad("Invalid hex escape sequence");
+					}
+					t.text += *p;
+					
+					t.literal.s += (char)((d1 << 4) | d2);
+				} else {
+					char esc = 0;
+					switch (*p) {
+					case '0': esc = '\0'; break;
+					case 'n': esc = '\n'; break;
+					case 'r': esc = '\r'; break;
+					case 't': esc = '\t'; break;
+					case 'v': esc = '\v'; break;
+					case 'b': esc = '\b'; break;
+					case 'f': esc = '\f'; break;
+					case '"': esc = '"'; break;
+					case '\'': esc = '\''; break;
+					case '\\': esc = '\\'; break;
+					default: return CodeError::Bad("Invalid escape sequence");
+					}
+					t.text += *p;
+					t.literal.s += esc;
+				}
+			} else {
+				t.literal.s += *p;
+			}
+		}
+
+		if (*p == '\0') {
+			return CodeError::Bad("Missing closing quote");
+		}
+
+		// Skip closing quote
+		++p;
+
+		t.text = quote + t.text + quote;
+		t.type = Token::Type::String;
+		out = std::move(t);
+		return CodeError::Good();
+	}
+
+	static void ConsumeWhitespace(StringIter& p) {
+		while (*p && IsWhitespaceChar(*p))
+			++p;
+	}
+
+	static CodeError ConsumeSymbol(StringIter& p, Token& t) {
+		for (; *p && IsPossibleSymbol(t.text + *p); ++p) {
+			t.text += *p;
+		}
+		t.type = Token::Type::Symbol;
+
+		if (std::find(SYMBOLS.begin(), SYMBOLS.end(), t.text) == SYMBOLS.end()) {
+			return CodeError::Bad("Unrecognised symbol " + t.text);
+		} else {
+			return CodeError::Good();
+		}
+	}
+
+	static CodeError TokenizeLine(const std::string& line, std::vector<Token>& out) {
+		std::vector<Token> tokens;
+		CodeError error = CodeError::Good();
+
+		StringIter p = line.data();
+		while (*p) {
+			size_t srcColumn = p - line.data();
+			bool wasWhitespace = false;
+
+			if (IsAlpha(*p)) {
+				tokens.push_back(ConsumeWord(p));
+			} else if (IsDigit(*p)) {
+				Token t{};
+				if (!(error = ConsumeNumber(p, t))) {
+					tokens.push_back(std::move(t));
+				}
+			} else if (*p == '\'' || *p == '"') {
+				Token t{};
+				if (!(error = ConsumeString(p, t))) {
+					tokens.push_back(std::move(t));
+				}
+			} else if (IsPossibleSymbol(*p)) {
+				Token t{};
+				if (!(error = ConsumeSymbol(p, t))) {
+					tokens.push_back(std::move(t));
+				}
+			} else if (IsWhitespaceChar(*p)) {
+				ConsumeWhitespace(p);
+				wasWhitespace = true;
+			} else {
+				error.good = false;
+				error.srcPos.column = srcColumn;
+				error.message = std::string("Unrecognised character ") + *p;
+			}
+
+			if (error) {
+				out.clear();
+				error.srcPos.column = srcColumn;
+				return error;
+			}
+
+			if (!wasWhitespace) {
+				tokens.back().srcPos.column = srcColumn;
+			}
+		}
+
+		out = std::move(tokens);
+		return CodeError::Good();
+	}
+
+	// Returns [no. of open brackets] minus [no. close brackets]
+	static int BracketBalance(std::vector<Token>& tokens) {
+		int balance = 0;
+		for (const auto& t : tokens) {
+			if (t.text.size() == 1) {
+				switch (t.text[0]) {
+				case '(': case '[': case '{': balance++; break;
+				case ')': case ']': case '}': balance--; break;
+				}
+			}
+		}
+		return balance;
+	}
+
+	LexResult Lex(std::string code) {
+		code = NormalizeLineEndings(code);
+		auto originalSource = SplitLines(code);
+
+		std::vector<std::string> lines = originalSource;
+		for (auto& line : lines)
+			StripComments(line);
+
+		CodeError error = CodeError::Good();
+		std::optional<std::string> indentString;
+		int bracketBalance = 0;
+
+		LexTree rootTree;
+		std::stack<LexTree*> parents;
+		parents.push(&rootTree);
+
+		for (size_t i = 0; i < lines.size(); i++) {
+			if (IsWhitespace(lines[i]))
+				continue;
+
+			std::vector<Token> tokens;
+			if (error = TokenizeLine(lines[i], tokens)) {
+				// Line had tokenizing errors
+				error.srcPos.line = i;
+				break;
+			} else {
+				// Assign line numbers
+				for (auto& token : tokens) {
+					token.srcPos.line = i;
+				}
+			}
+
+			bool continuePrevLine = bracketBalance > 0;
+			bracketBalance = std::max(0, bracketBalance + BracketBalance(tokens));
+			if (continuePrevLine) {
+				// Ignore indenting and continue as previous line
+				auto& prevLineTokens = parents.top()->children.back().tokens;
+				prevLineTokens.insert(prevLineTokens.end(), tokens.begin(), tokens.end());
+				continue;
+			}
+
+			// Get indentation level
+			size_t parentIndent = parents.size() - 1;
+			size_t currentIndent = 0;
+			if (IndentOf(lines[i], indentString, currentIndent)) {
+				error = CodeError::Bad("Invalid indentation", { i, 0 });
+				break;
+			}
+
+			if (currentIndent > parentIndent + 1) {
+				// Indented too much
+				error = CodeError::Bad("Indentation level increased by more than 1", { i, 0 });
+				break;
+			} else if (currentIndent == parentIndent + 1) {
+				// Indented
+				// Make the last child the new parent
+				if (parents.top()->children.empty()) {
+					error = CodeError::Bad("Indentation not expected", { i, 0 });
+					break;
+				}
+				parents.push(&parents.top()->children.back());
+			} else if (currentIndent < parentIndent) {
+				// De-indented
+				for (size_t j = 0; j < parentIndent - currentIndent; j++)
+					parents.pop();
+			}
+
+			parents.top()->children.push_back(LexTree{ std::move(tokens), {} });
+		}
+
+		LexResult result{};
+		result.error = std::move(error);
+		result.lexTree = std::move(rootTree);
+		result.originalSource = std::move(originalSource);
+		return result;
+	}
+}
+
+
+namespace wings {
+	bool ImportMath(Wg_Context* context);
+}
+
+
+#include <cmath>
+#include <limits>
+
+namespace wings {
+	namespace mathmodule {
+		static constexpr const char* MATH_CODE = R"(
+def comb(n, k):
+	if not isinstance(n, int) or not isinstance(k, int):
+		raise TypeError("comb() only accepts integers")
+	if n < 0 or k < 0:
+		raise ValueError("comb() only accepts non-negative integers")
+	if k > n:
+		return 0
+	return factorial(n) // (factorial(k) * factorial(n - k))
+
+def fabs(x):
+	return float(abs(x))
+
+def factorial(n):
+	if not isinstance(n, int):
+		raise TypeError("factorial() only accepts integers")
+	if n < 0:
+		raise ValueError("factorial() only accepts non-negative integers")
+	if n == 0:
+		return 1
+	return n * factorial(n - 1)
+
+def gcd(*integers):
+	if len(integers) == 0:
+		raise TypeError("gcd() requires at least one argument")
+	for i in integers:
+		if not isinstance(i, int):
+			raise TypeError("gcd() only accepts integers")
+	if len(integers) == 1:
+		return abs(integers[0])
+	if len(integers) == 2:
+		(a, b) = integers
+		if a == 0:
+			return abs(b)
+		if b == 0:
+			return abs(a)
+		while b != 0:
+			(a, b) = (b, a % b)
+		return abs(a)
+	return gcd(gcd(integers[0], integers[1]), *integers[2:])
+
+def lcm(*integers):
+	if len(integers) == 0:
+		raise TypeError("lcm() requires at least one argument")
+	for i in integers:
+		if not isinstance(i, int):
+			raise TypeError("lcm() only accepts integers")
+	if len(integers) == 1:
+		return abs(integers[0])
+	if len(integers) == 2:
+		(a, b) = integers
+		if a == 0 or b == 0:
+			return 0
+		return abs(a * b) // gcd(a, b)
+	return lcm(lcm(integers[0], integers[1]), *integers[2:])
+
+def modf(x):
+	r = x % 1.0
+	return (r, x - r)
+
+def perm(n, k=None):
+	if not isinstance(n, int):
+		raise TypeError("perm() only accepts integers")
+	if n < 0:
+		raise ValueError("perm() only accepts non-negative integers")
+	if k is None:
+		k = n
+	if not isinstance(k, int):
+		raise TypeError("perm() only accepts integers")
+	if k < 0:
+		raise ValueError("perm() only accepts non-negative integers")
+	if k > n:
+		return 0
+	return factorial(n) // factorial(n - k)
+
+def trunc(x):
+	if x >= 0:
+		return int(x)
+	return int(x) - 1
+
+def exp(x):
+	return e ** x
+
+def log1p(x):
+	return log(1 + x)
+
+def log2(x):
+	return log(x, 2)
+
+def log10(x):
+	return log(x, 10)
+
+def pow(x, y):
+	if x == 1 or y == 0:
+		return 1
+	if isfinite(x) and isfinite(y) and x < 0 and isinstance(y, int):
+		raise ValueError("negative number cannot be raised to a fractional power")
+	return x ** y
+
+def sqrt(x):
+	return x ** 0.5
+
+def dist(p, q):
+	return sqrt(sum([(z[0] - z[1]) ** 2 for z in zip(p, q)]))
+
+def hypot(*coords):
+	return sqrt(sum([x ** 2 for x in coords]))
+
+def degrees(x):
+	return x * 180.0 / pi
+
+def radians(x):
+	return x * pi / 180.0
+)";
+
+		constexpr Wg_float MATH_E = (Wg_float)2.71828182845904523536;
+		constexpr Wg_float MATH_PI = (Wg_float)3.14159265358979323846;
+
+		static Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			if (Wg_IsIntOrFloat(argv[0])) {
+				return Wg_NewInt(context, (Wg_int)std::ceil(Wg_GetFloat(argv[0])));
+			}
+			return Wg_CallMethod(argv[0], "__ceil__", nullptr, 0);
+		}
+
+		static Wg_Obj* floor(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			if (Wg_IsIntOrFloat(argv[0])) {
+				return Wg_NewInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0])));
+			}
+			return Wg_CallMethod(argv[0], "__floor__", nullptr, 0);
+		}
+
+		using FpCheck = bool(*)(Wg_float);
+
+		template <FpCheck f>
+		static Wg_Obj* isx(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			return Wg_NewBool(context, f(Wg_GetFloat(argv[0])));
+		}
+
+		static Wg_Obj* isfinite(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isfinite>(context, argv, argc);
+		}
+
+		static Wg_Obj* isinf(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isinf>(context, argv, argc);
+		}
+
+		static Wg_Obj* isnan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isnan>(context, argv, argc);
+		}
+
+		static Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			Wg_float base = MATH_E;
+			if (argc == 2) {
+				WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+				base = Wg_GetFloat(argv[1]);
+			}
+			return Wg_NewFloat(context, std::log(Wg_GetFloat(argv[0])) / std::log(base));
+		}
+
+		using Op = Wg_float(*)(Wg_float);
+
+		template <Op op>
+		static Wg_Obj* opx(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			return Wg_NewFloat(context, op(Wg_GetFloat(argv[0])));
+		}
+
+		static Wg_Obj* cos(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::cos>(context, argv, argc);
+		}
+
+		static Wg_Obj* sin(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::sin>(context, argv, argc);
+		}
+
+		static Wg_Obj* tan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tan>(context, argv, argc);
+		}
+
+		static Wg_Obj* acos(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::acos>(context, argv, argc);
+		}
+
+		static Wg_Obj* asin(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::asin>(context, argv, argc);
+		}
+
+		static Wg_Obj* atan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::atan>(context, argv, argc);
+		}
+
+		static Wg_Obj* cosh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::cosh>(context, argv, argc);
+		}
+
+		static Wg_Obj* sinh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::sinh>(context, argv, argc);
+		}
+
+		static Wg_Obj* tanh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tanh>(context, argv, argc);
+		}
+
+		static Wg_Obj* acosh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::acosh>(context, argv, argc);
+		}
+
+		static Wg_Obj* asinh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::asinh>(context, argv, argc);
+		}
+
+		static Wg_Obj* atanh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::atanh>(context, argv, argc);
+		}
+
+		static Wg_Obj* erf(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::erf>(context, argv, argc);
+		}
+
+		static Wg_Obj* erfc(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::erfc>(context, argv, argc);
+		}
+
+		static Wg_Obj* gamma(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tgamma>(context, argv, argc);
+		}
+
+		static Wg_Obj* lgamma(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::lgamma>(context, argv, argc);
+		}
+
+		static Wg_Obj* atan2(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+			return Wg_NewFloat(context, std::atan2(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
+		}
+	}
+	
+	bool ImportMath(Wg_Context* context) {
+		using namespace mathmodule;
+		try {
+			RegisterFunction(context, "ceil", ceil);
+			RegisterFunction(context, "floor", floor);
+			RegisterFunction(context, "isfinite", isfinite);
+			RegisterFunction(context, "isinf", isinf);
+			RegisterFunction(context, "isnan", isnan);
+			RegisterFunction(context, "log", log);
+			RegisterFunction(context, "cos", cos);
+			RegisterFunction(context, "sin", sin);
+			RegisterFunction(context, "tan", tan);
+			RegisterFunction(context, "acos", acos);
+			RegisterFunction(context, "asin", asin);
+			RegisterFunction(context, "atan", atan);
+			RegisterFunction(context, "atan2", atan2);
+			RegisterFunction(context, "cosh", cosh);
+			RegisterFunction(context, "sinh", sinh);
+			RegisterFunction(context, "tanh", tanh);
+			RegisterFunction(context, "acosh", acosh);
+			RegisterFunction(context, "asinh", asinh);
+			RegisterFunction(context, "atanh", atanh);
+			RegisterFunction(context, "erf", erf);
+			RegisterFunction(context, "erfc", erfc);
+			RegisterFunction(context, "gamma", gamma);
+			RegisterFunction(context, "lgamma", lgamma);
+
+			RegisterConstant(context, "e", Wg_NewFloat, MATH_E);
+			RegisterConstant(context, "inf", Wg_NewFloat, std::numeric_limits<Wg_float>::infinity());
+			RegisterConstant(context, "nan", Wg_NewFloat, std::numeric_limits<Wg_float>::quiet_NaN());
+			RegisterConstant(context, "pi", Wg_NewFloat, MATH_PI);
+			RegisterConstant(context, "tau", Wg_NewFloat, 2 * MATH_PI);
+
+			if (Execute(context, MATH_CODE, "math") == nullptr)
+				throw LibraryInitException();
+
+			return true;
+		} catch (LibraryInitException&) {
+			return false;
+		}
+	}
+}
+
+
+namespace wings {
+	bool ImportOS(Wg_Context* context);
+}
+
+
+#include <cstdlib>
+#include <filesystem>
+
+namespace wings {
+	namespace osmodule {
+		namespace fs = std::filesystem;
+
+		static Wg_Obj* system(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			int ec = std::system(Wg_GetString(argv[0]));
+			return Wg_NewInt(context, (Wg_int)ec);
+		}
+
+		static Wg_Obj* mkdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
+			std::error_code ec{};
+			if (!fs::create_directory(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* makedirs(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
+			std::error_code ec{};
+			if (!fs::create_directories(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* remove(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
+
+			std::error_code ec{};
+			if (!fs::is_regular_file(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_ISADIRECTORYERROR);
+				return nullptr;
+			}
+
+			if (!fs::remove(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* rmdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
+
+			std::error_code ec{};
+			if (!fs::is_directory(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			if (!fs::remove(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* rename(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			WG_EXPECT_ARG_TYPE_STRING(1);
+			const char* src = Wg_GetString(argv[0]);
+			const char* dst = Wg_GetString(argv[1]);
+
+			std::error_code ec{};
+			fs::rename(src, dst, ec);
+			if (ec) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* listdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT_BETWEEN(0, 1);
+			const char* path = ".";
+			if (argc == 1) {
+				WG_EXPECT_ARG_TYPE_STRING(0);
+				path = Wg_GetString(argv[0]);
+			}
+
+			std::error_code ec{};
+			std::vector<fs::path> paths;
+			for (const auto& entry : std::filesystem::directory_iterator(path, ec)) {
+				paths.push_back(entry.path());
+			}
+
+			if (ec) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			Wg_Obj* list = Wg_NewList(context);
+			if (list == nullptr)
+				return nullptr;
+			Wg_ObjRef ref(list);
+
+			for (const auto& path : paths) {
+				Wg_Obj* entry = Wg_NewString(context, path.string().c_str());
+				if (entry == nullptr)
+					return nullptr;
+				if (Wg_CallMethod(list, "append", &entry, 1) == nullptr)
+					return nullptr;
+			}
+
+			return list;
+		}
+
+		static Wg_Obj* abort(Wg_Context* context, Wg_Obj**, int argc) {
+			WG_EXPECT_ARG_COUNT(0);
+			std::abort();
+		}
+
+		static Wg_Obj* chdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
+
+			std::error_code ec{};
+			fs::current_path(path, ec);
+			if (ec) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* getcwd(Wg_Context* context, Wg_Obj**, int argc) {
+			WG_EXPECT_ARG_COUNT(0);
+			auto path = fs::current_path().string();
+			return Wg_NewString(context, path.c_str());
+		}
+	}
+
+	bool ImportOS(Wg_Context* context) {
+		using namespace osmodule;
+		try {
+			RegisterFunction(context, "system", system);
+			RegisterFunction(context, "chdir", chdir);
+			RegisterFunction(context, "getcwd", getcwd);
+			RegisterFunction(context, "mkdir", mkdir);
+			RegisterFunction(context, "makedirs", makedirs);
+			RegisterFunction(context, "remove", remove);
+			RegisterFunction(context, "rmdir", rmdir);
+			RegisterFunction(context, "rename", rename);
+			RegisterFunction(context, "listdir", listdir);
+			RegisterFunction(context, "abort", abort);
+			
+			Wg_SetGlobal(context, "error", Wg_GetGlobal(context, "OSError"));
+
+#ifdef _WIN32
+			RegisterConstant(context, "sep", Wg_NewString, "\\");
+			RegisterConstant(context, "linesep", Wg_NewString, "\r\n");
+#else
+			RegisterConstant(context, "sep", Wg_NewString, "/");
+			RegisterConstant(context, "linesep", Wg_NewString, "\r");
+#endif
+			return true;
+		} catch (LibraryInitException&) {
+			return false;
+		}
+	}
+}
+
+
+#include <unordered_map>
+#include <functional>
+#include <algorithm>
+#include <iterator>
+
+namespace wings {
+
+	static thread_local std::vector<size_t> statementHierarchy;
+
+	template <class StatType>
+	static CodeError ParseBody(const LexTree& node, std::vector<Statement>& out);
+
+	static CodeError CheckTrailingTokens(const TokenIter& p) {
+		if (!p.EndReached()) {
+			return CodeError::Bad("Unexpected trailing tokens", p->srcPos);
+		} else {
+			return CodeError::Good();
+		}
+	}
+
+	static CodeError ExpectColonEnding(TokenIter& p) {
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text != ":") {
+			return CodeError::Bad("Expected a ':'", p->srcPos);
+		}
+		++p;
+
+		return CheckTrailingTokens(p);
+	}
+
+	template <class StatType>
+	static CodeError ParseConditionalBlock(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		StatType data{};
+		if (auto error = ParseExpression(p, data.expr)) {
+			return error;
+		}
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+		
+		if (auto error = ParseBody<StatType>(node, data.body)) {
+			return error;
+		}
+		
+		out.data = std::move(data);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseIf(const LexTree& node, Statement& out) {
+		return ParseConditionalBlock<stat::If>(node, out);
+	}
+
+	static CodeError ParseElif(const LexTree& node, Statement& out) {
+		return ParseConditionalBlock<stat::Elif>(node, out);
+	}
+
+	static CodeError ParseElse(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+		
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		stat::Else elseStat;
+		if (auto error = ParseBody<stat::Else>(node, elseStat.body)) {
+			return error;
+		}
+
+		out.data = std::move(elseStat);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseWhile(const LexTree& node, Statement& out) {
+		return ParseConditionalBlock<stat::While>(node, out);
+	}
+
+	static CodeError ParseVariableList(TokenIter& p, std::vector<std::string>& out) {
+		out.clear();
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a variable name", p->srcPos);
+		}
+
+		while (true) {
+			out.push_back(p->text);
+			++p;
+
+			if (p.EndReached()) {
+				return CodeError::Good();
+			} else if (p->text != ",") {
+				return CodeError::Good();
+			} 
+			++p;
+
+			if (p.EndReached()) {
+				return CodeError::Good();
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Good();
+			}
+		}
+	}
+
+	Statement TransformForToWhile(stat::For forLoop) {
+		// __VarXXX = expression.__iter__()
+		std::string rangeVarName = "__For" + std::to_string(Guid());
+
+		Expression loadIter;
+		loadIter.srcPos = forLoop.expr.srcPos;
+		loadIter.operation = Operation::Dot;
+		loadIter.variableName = "__iter__";
+		loadIter.children.push_back(std::move(forLoop.expr));
+
+		Expression callIter;
+		callIter.srcPos = forLoop.expr.srcPos;
+		callIter.operation = Operation::Call;
+		callIter.children.push_back(std::move(loadIter));
+		
+		Statement rangeEval;
+		rangeEval.srcPos = forLoop.expr.srcPos;
+		{
+			stat::Expr assign;
+			assign.expr.operation = Operation::Assign;
+			assign.expr.srcPos = forLoop.expr.srcPos;
+			assign.expr.assignTarget.type = AssignType::Direct;
+			assign.expr.assignTarget.direct = rangeVarName;
+			assign.expr.children.push_back({}); // Dummy
+			assign.expr.children.push_back(std::move(callIter));
+			rangeEval.data = std::move(assign);
+		}
+
+		// while True:
+		Expression condition;
+		condition.srcPos = forLoop.expr.srcPos;
+		condition.operation = Operation::Literal;
+		condition.literalValue.type = LiteralValue::Type::Bool;
+		condition.literalValue.b = true;
+
+		Statement wh;
+		wh.srcPos = forLoop.expr.srcPos;
+		{
+			stat::While w;
+			w.expr = std::move(condition);
+			wh.data = std::move(w);
+		}
+
+		// try:
+		//		__VarXXX = __VarXXX.__next__()
+		// except StopIteration:
+		//		break
+		Statement brk;
+		brk.srcPos = forLoop.expr.srcPos;
+		{
+			stat::Break b;
+			b.finallyCount = 1;
+			b.exitForLoopNormally = true;
+			brk.data = std::move(b);
+		}
+
+		Expression stopIter;
+		stopIter.srcPos = forLoop.expr.srcPos;
+		stopIter.operation = Operation::Variable;
+		stopIter.variableName = "StopIteration";
+
+		Statement except;
+		except.srcPos = forLoop.expr.srcPos;
+		{
+			stat::Except exc;
+			exc.type = std::move(stopIter);
+			exc.body.push_back(std::move(brk));
+			except.data = std::move(exc);
+		}
+
+		Statement tryExcept;
+		tryExcept.srcPos = forLoop.expr.srcPos;
+		{
+			stat::Try tr;
+			tr.exceptBlocks.push_back(std::move(except));
+			tryExcept.data = std::move(tr);
+		}
+
+		// vars = __VarXXX.__next__()
+		Expression rangeVar;
+		rangeVar.srcPos = forLoop.expr.srcPos;
+		rangeVar.operation = Operation::Variable;
+		rangeVar.variableName = rangeVarName;
+
+		Expression loadNext;
+		loadNext.srcPos = forLoop.expr.srcPos;
+		loadNext.operation = Operation::Dot;
+		loadNext.variableName = "__next__";
+		loadNext.children.push_back(std::move(rangeVar));
+
+		Expression callNext;
+		callNext.srcPos = forLoop.expr.srcPos;
+		callNext.operation = Operation::Call;
+		callNext.children.push_back(std::move(loadNext));
+
+		Expression iterAssign;
+		iterAssign.srcPos = forLoop.expr.srcPos;
+		iterAssign.operation = Operation::Assign;
+		iterAssign.assignTarget = forLoop.assignTarget;
+		iterAssign.children.push_back({}); // Dummy
+		iterAssign.children.push_back(std::move(callNext));
+
+		Statement iterAssignStat;
+		iterAssignStat.srcPos = forLoop.expr.srcPos;
+		{
+			stat::Expr expr;
+			expr.expr = std::move(iterAssign);
+			iterAssignStat.data = std::move(expr);
+		}
+		tryExcept.Get<stat::Try>().body.push_back(std::move(iterAssignStat));
+
+		// Transfer body over
+		auto& whileBody = wh.Get<stat::While>().body;
+		whileBody.push_back(std::move(tryExcept));
+		for (auto& child : forLoop.body)
+			whileBody.push_back(std::move(child));
+
+		Statement out;
+		out.srcPos = forLoop.expr.srcPos;
+		{
+			stat::Composite comp;
+			comp.body.push_back(std::move(rangeEval));
+			comp.body.push_back(std::move(wh));
+			out.data = std::move(comp);
+		}
+		return out;
+	}
+
+	CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple) {
+		bool mustTerminate = false;
+		isTuple = false;
+		while (true) {
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected 'in'", (--p)->srcPos);
+			} else if (p->text == "in") {
+				if (vars.empty()) {
+					return CodeError::Bad("Expected a variable name", p->srcPos);
+				} else {
+					return CodeError::Good();
+				}
+			} else if (mustTerminate) {
+				return CodeError::Bad("Expected 'in'", p->srcPos);
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Bad("Expected a variable name", p->srcPos);
+			}
+			vars.push_back(p->text);
+			++p;
+
+			if (!p.EndReached() && p->text == ",") {
+				isTuple = true;
+				++p;
+			} else {
+				mustTerminate = true;
+			}
+		}
+	}
+
+	static CodeError ParseFor(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		std::vector<std::string> vars;
+		bool isTuple{};
+		if (auto error = ParseForLoopVariableList(p, vars, isTuple)) {
+			return error;
+		}
+		++p;
+
+		stat::For forLoop;
+
+		if (!isTuple) {
+			forLoop.assignTarget.type = AssignType::Direct;
+			forLoop.assignTarget.direct = vars[0];
+		} else {
+			forLoop.assignTarget.type = AssignType::Pack;
+			for (auto& var : vars) {
+				AssignTarget elem{};
+				elem.type = AssignType::Direct;
+				elem.direct = std::move(var);
+				forLoop.assignTarget.pack.push_back(std::move(elem));
+			}
+		}
+
+		if (auto error = ParseExpression(p, forLoop.expr)) {
+			return error;
+		}
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		if (auto error = ParseBody<stat::For>(node, forLoop.body)) {
+			return error;
+		}
+
+		out = TransformForToWhile(std::move(forLoop));
+		return CodeError::Good();
+	}
+
+	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
+		out.clear();
+		Parameter::Type type = Parameter::Type::Named;
+		while (true) {
+			if (p.EndReached()) {
+				return CodeError::Good();
+			} else if (p->text == "*") {
+				if (type == Parameter::Type::ListArgs) {
+					return CodeError::Bad("Only 1 variadic arguments parameter is allowed", p->srcPos);
+				} else if (type == Parameter::Type::Kwargs) {
+					return CodeError::Bad("Keyword arguments parameter must appear last", p->srcPos);
+				}
+				type = Parameter::Type::ListArgs;
+				++p;
+			} else if (p->text == "**") {
+				if (type == Parameter::Type::Kwargs) {
+					return CodeError::Bad("Only 1 keyword arguments parameter is allowed", p->srcPos);
+				}
+				type = Parameter::Type::Kwargs;
+				++p;
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Good();
+			} else {
+				if (type != Parameter::Type::Named) {
+					return CodeError::Bad("Regular parameters must appear first", p->srcPos);
+				}
+			}
+
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected a parameter name", (--p)->srcPos);
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Bad("Expected a parameter name", p->srcPos);
+			}
+
+			std::string parameterName = p->text;
+
+			// Check for duplicate parameters
+			if (std::find_if(out.begin(), out.end(), [&](const Parameter& p) {
+				return p.name == parameterName;
+				}) != out.end()) {
+				return CodeError::Bad("Duplicate parameter name", p->srcPos);
+			}
+			++p;
+
+			std::optional<Expression> defaultValue;
+			if (p.EndReached()) {
+				out.push_back(Parameter{ parameterName, std::nullopt, type });
+				return CodeError::Good();
+			} else if (p->text == "=") {
+				// Default value
+				if (type != Parameter::Type::Named) {
+					return CodeError::Bad("Only regular parameters can have a default argument", p->srcPos);
+				}
+				++p;
+				Expression expr{};
+				if (auto error = ParseExpression(p, expr)) {
+					return error;
+				}
+				defaultValue = std::move(expr);
+			} else if (!out.empty() && out.back().defaultValue) {
+				// If last parameter has a default value,
+				// this parameter must also have a default value
+				return CodeError::Bad(
+					"Parameters with default values must appear at the end of the parameter list",
+					(--p)->srcPos
+				);
+			}
+
+			out.push_back(Parameter{ std::move(parameterName), std::move(defaultValue), type });
+
+			if (p.EndReached()) {
+				return CodeError::Good();
+			} else if (p->text != ",") {
+				return CodeError::Good();
+			}
+			++p;
+		}
+	}
+
+	std::unordered_set<std::string> GetReferencedVariables(const AssignTarget& target) {
+		if (target.type == AssignType::Direct) {
+			return { target.direct };
+		} else {
+			std::unordered_set<std::string> variables;
+			for (const auto& child : target.pack)
+				variables.merge(GetReferencedVariables(child));
+			return variables;
+		}
+	}
+
+	// Get a set of variables referenced by an expression
+	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
+		std::unordered_set<std::string> variables;
+		if (expr.operation == Operation::Variable) {
+			variables.insert(expr.variableName);
+		} else {
+			for (const auto& child : expr.children) {
+				variables.merge(GetReferencedVariables(child));
+			}
+		}
+		return variables;
+	}
+
+	// Get a set of variables directly written to by the '=' operator. This excludes compound assignment.
+	static std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
+		if (expr.operation == Operation::Assign && (expr.assignTarget.type == AssignType::Direct || expr.assignTarget.type == AssignType::Pack)) {
+			return GetReferencedVariables(expr.assignTarget);
+		} else {
+			std::unordered_set<std::string> variables;
+			for (const auto& child : expr.children)
+				variables.merge(GetWriteVariables(child));
+			return variables;
+		}
+	}
+
+	template <typename T, typename Subtract, typename... Args>
+	static std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const Subtract& subtract, const Args&... args) {
+		if constexpr (sizeof...(args) == 0) {
+			std::unordered_set<T> diff = set;
+			for (const auto& sub : subtract)
+				diff.erase(sub);
+			return diff;
+		} else {
+			return SetDifference(SetDifference(set, subtract), args...);
+		}
+	}
+
+	static void ResolveCaptures(Expression& func) {
+		std::unordered_set<std::string> writeVars;
+		std::unordered_set<std::string> allVars;
+		
+		auto processExpression = [&]<class T>(const T* data) {
+			const Expression& expr = data->expr;
+			if (expr.operation == Operation::Function) {
+				writeVars.insert(expr.def.name);
+				allVars.insert(expr.def.name);
+				for (const auto& parameter : expr.def.parameters) {
+					if (parameter.defaultValue) {
+						writeVars.merge(GetWriteVariables(parameter.defaultValue.value()));
+						allVars.merge(GetReferencedVariables(parameter.defaultValue.value()));
+					}
+				}
+				allVars.insert(expr.def.localCaptures.begin(), expr.def.localCaptures.end());
+			} else {
+				writeVars.merge(GetWriteVariables(expr));
+				allVars.merge(GetReferencedVariables(expr));
+			}
+		};
+
+		std::function<void(const std::vector<Statement>&)> scan =
+		[&](const std::vector<Statement>& body) {
+			for (const auto& child : body) {
+				if (auto* node = child.GetIf<stat::Expr>()) {
+					processExpression(node);
+				} else if (auto* node = child.GetIf<stat::If>()) {
+					processExpression(node);
+					scan(node->body);
+					if (node->elseClause)
+						scan(node->elseClause->Get<stat::Else>().body);
+				} else if (auto* node = child.GetIf<stat::Elif>()) {
+					processExpression(node);
+					scan(node->body);
+				} else if (auto* node = child.GetIf<stat::While>()) {
+					processExpression(node);
+					scan(node->body);
+				} else if (auto* node = child.GetIf<stat::Return>()) {
+					processExpression(node);
+				} else if (auto* node = child.GetIf<stat::Class>()) {
+					writeVars.insert(node->name);
+					allVars.insert(node->name);
+				} else if (auto* node = child.GetIf<stat::Def>()) {
+					writeVars.insert(node->expr.def.name);
+					allVars.insert(node->expr.def.name);
+				} else if (auto* node = child.GetIf<stat::Global>()) {
+					func.def.globalCaptures.insert(node->name);
+				} else if (auto* node = child.GetIf<stat::NonLocal>()) {
+					func.def.localCaptures.insert(node->name);
+				}
+			}
+		};
+
+		scan(func.def.body);
+
+		std::vector<std::string> parameterVars;
+		for (const auto& param : func.def.parameters)
+			parameterVars.push_back(param.name);
+		func.def.localCaptures.merge(SetDifference(allVars, writeVars, parameterVars));
+		func.def.variables = SetDifference(writeVars, func.def.globalCaptures, func.def.localCaptures, parameterVars);
+	}
+
+	static CodeError ParseDef(const LexTree& node, Statement& out) {		
+		TokenIter p(node.tokens);
+		++p;
+
+		Expression fn{};
+		fn.srcPos = node.tokens[0].srcPos;
+		fn.operation = Operation::Function;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a function name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a function name", p->srcPos);
+		}
+		fn.def.name = p->text;
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a '('", (--p)->srcPos);
+		} else if (p->text != "(") {
+			return CodeError::Bad("Expected a '('", p->srcPos);
+		}
+		++p;
+
+		if (auto error = ParseParameterList(p, fn.def.parameters)) {
+			return error;
+		}
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ')'", (--p)->srcPos);
+		} else if (p->text != ")") {
+			return CodeError::Bad("Expected a ')'", p->srcPos);
+		}
+		++p;
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		if (auto error = ParseBody<stat::Def>(node, fn.def.body)) {
+			return error;
+		}
+		
+		ResolveCaptures(fn);
+		
+		stat::Def def;
+		def.expr = std::move(fn);
+		out.data = std::move(def);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseClass(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a class name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a class name", p->srcPos);
+		}
+		stat::Class klass;
+		klass.name = p->text;
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text == "(") {
+			++p;
+			if (auto error = ParseExpressionList(p, ")", klass.bases)) {
+				return error;
+			}
+			++p;
+		}
+
+		if (node.children.empty()) {
+			return CodeError::Bad("Expected class body", (--p)->srcPos);
+		}
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		for (const auto& method : node.children) {
+			if (method.tokens[0].text == "pass") {
+				continue;
+			} else if (method.tokens[0].text != "def") {
+				return CodeError::Bad("Expected a method definition");
+			}
+
+			Statement stat;
+			if (auto error = ParseDef(method, stat)) {
+				return error;
+			}
+			stat.srcPos = method.tokens[0].srcPos;
+			klass.methodNames.push_back(stat.Get<stat::Def>().expr.def.name);
+			klass.body.push_back(std::move(stat));
+		}
+
+		out.data = std::move(klass);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseTry(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+		
+		stat::Try tr;
+		if (auto error = ParseBody<stat::Try>(node, tr.body)) {
+			return error;
+		}
+
+		out.data = std::move(tr);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseExcept(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		stat::Except exc;
+
+		Expression exceptType{};
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text == ":") {
+			goto end;
+		} else if (auto error = ParseExpression(p, exceptType)) {
+			return error;
+		}
+		exc.type = std::move(exceptType);
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text == ":") {
+			goto end;
+		} else if (p->text != "as") {
+			return CodeError::Bad("Expected a 'as'", p->srcPos);
+		}
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected an identifier", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected an identifier", p->srcPos);
+		}
+		exc.variable = p->text;
+		++p;
+		
+	end:
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		if (auto error = ParseBody<stat::Except>(node, exc.body)) {
+			return error;
+		}
+		
+		out.data = std::move(exc);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseFinally(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		stat::Finally fin;
+		if (auto error = ParseBody<stat::Finally>(node, fin.body)) {
+			return error;
+		}
+
+		out.data = std::move(fin);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseRaise(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		stat::Raise raise;
+		if (auto error = ParseExpression(p, raise.expr)) {
+			return error;
+		}
+		
+		out.data = std::move(raise);
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseWith(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		SourcePosition srcPos = p->srcPos;
+		++p;
+
+		Expression manager{};
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (auto error = ParseExpression(p, manager)) {
+			return error;
+		}
+
+		std::string var;
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text == ":") {
+			goto end;
+		} else if (p->text != "as") {
+			return CodeError::Bad("Expected a 'as'", p->srcPos);
+		}
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected an identifier", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected an identifier", p->srcPos);
+		}
+		var = p->text;
+		++p;
+
+	end:
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		std::vector<Statement> body;
+		if (auto error = ParseBody<stat::Composite>(node, body)) {
+			return error;
+		}
+
+		/*
+		 * __WithMgr = <expr>
+		 * [<var> =] __WithMgr.__enter__()
+		 * try:
+		 *		<body>
+		 * finally:
+		 * 		__WithMgr.__exit__(None, None, None)
+		 */
+
+		std::vector<Statement> mainBody;
+
+		// __WithMgr = <expr>
+		std::string mgrName = "__WithMgr" + std::to_string(Guid());
+		Expression assignMgr{};
+		assignMgr.srcPos = srcPos;
+		assignMgr.operation = Operation::Assign;
+		assignMgr.assignTarget.type = AssignType::Direct;
+		assignMgr.assignTarget.direct = mgrName;
+		assignMgr.children.push_back({}); // Dummy
+		assignMgr.children.push_back(std::move(manager));
+
+		Statement assignMgrStat;
+		assignMgrStat.srcPos = srcPos;
+		{
+			stat::Expr expr;
+			expr.expr = std::move(assignMgr);
+			assignMgrStat.data = std::move(expr);
+		}
+		mainBody.push_back(std::move(assignMgrStat));
+
+		// [<var> =] __WithMgr.__enter__()
+		auto loadMgr = [&] {
+			Expression load{};
+			load.srcPos = srcPos;
+			load.operation = Operation::Variable;
+			load.variableName = mgrName;
+			return load;
+		};
+
+		Expression enter;
+		enter.srcPos = srcPos;
+		enter.operation = Operation::Dot;
+		enter.variableName = "__enter__";
+		enter.children.push_back(loadMgr());
+
+		Expression enterCall;
+		enterCall.srcPos = srcPos;
+		enterCall.operation = Operation::Call;
+		enterCall.children.push_back(std::move(enter));
+
+		Statement enterStat;
+		enterStat.srcPos = srcPos;
+		if (!var.empty()) {
+			stat::Expr assign;
+			assign.expr.srcPos = srcPos;
+			assign.expr.operation = Operation::Assign;
+			assign.expr.assignTarget.type = AssignType::Direct;
+			assign.expr.assignTarget.direct = std::move(var);
+			assign.expr.children.push_back({}); // Dummy
+			assign.expr.children.push_back(std::move(enterCall));
+			enterStat.data = std::move(assign);
+		} else {
+			stat::Expr expr;
+			expr.expr = std::move(enterCall);
+			enterStat.data = std::move(expr);
+		}
+		mainBody.push_back(std::move(enterStat));
+
+		// __WithMgr.__exit__(None, None, None)
+		Expression loadExit;
+		loadExit.srcPos = srcPos;
+		loadExit.operation = Operation::Dot;
+		loadExit.variableName = "__exit__";
+		loadExit.children.push_back(loadMgr());
+
+		auto loadNone = [&] {
+			Expression none{};
+			none.srcPos = srcPos;
+			none.operation = Operation::Literal;
+			none.literalValue.type = LiteralValue::Type::Null;
+			return none;
+		};
+		
+		Expression exit;
+		exit.srcPos = srcPos;
+		exit.operation = Operation::Call;
+		exit.children.push_back(std::move(loadExit));
+		exit.children.push_back(loadNone());
+		exit.children.push_back(loadNone());
+		exit.children.push_back(loadNone());
+
+		Statement exitStat;
+		exitStat.srcPos = srcPos;
+		{
+			stat::Expr expr;
+			expr.expr = std::move(exit);
+			exitStat.data = std::move(expr);
+		}
+
+		// try/finally
+		Statement tryBlock{};
+		tryBlock.srcPos = srcPos;
+		{
+			stat::Try tryStat;
+			tryStat.body = std::move(body);
+			tryStat.finallyBody.push_back(std::move(exitStat));
+			tryBlock.data = std::move(tryStat);
+		}
+		mainBody.push_back(std::move(tryBlock));
+
+		// Produce composite statement
+		stat::Composite comp;
+		comp.body = std::move(mainBody);
+		out.data = std::move(comp);
+		return CodeError::Good();
+	}
+
+	static CodeError CheckBreakable(const LexTree& node) {
+		auto it = statementHierarchy.rbegin();
+		while (true) {
+			switch (*it) {
+			case StatIndex<stat::Def>():
+			case StatIndex<stat::Root>():
+				return CodeError::Bad("'break' or 'continue' outside of loop", node.tokens[0].srcPos);
+			case StatIndex<stat::For>():
+			case StatIndex<stat::While>():
+				return CodeError::Good();
+			}
+			++it;
+		}
+	}
+
+	static size_t BreakableTryExceptCount() {
+		size_t count = 0;
+		for (auto it = statementHierarchy.rbegin(); ; ++it) {
+			switch (*it) {
+			case StatIndex<stat::Def>():
+			case StatIndex<stat::Root>():
+			case StatIndex<stat::For>():
+			case StatIndex<stat::While>():
+				return count;
+			case StatIndex<stat::Try>():
+				count++;
+				break;
+			}
+		}
+	}
+
+	static size_t TotalTryExceptCount() {
+		size_t count = 0;
+		for (auto it = statementHierarchy.rbegin(); ; ++it) {
+			switch (*it) {
+			case StatIndex<stat::Def>():
+			case StatIndex<stat::Root>():
+				return count;
+			case StatIndex<stat::Try>():
+				count++;
+				break;
+			}
+		}
+	}
+	
+	static CodeError ParseReturn(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+		
+		stat::Return expr;
+		expr.finallyCount = TotalTryExceptCount();
+
+		if (p.EndReached()) {
+			expr.expr.operation = Operation::Literal;
+			expr.expr.literalValue.type = LiteralValue::Type::Null;
+			expr.expr.srcPos = (--p)->srcPos;
+			out.data = std::move(expr);
+			return CodeError::Good();
+		} else if (auto error = ParseExpression(p, expr.expr)) {
+			return error;
+		} else {
+			out.data = std::move(expr);
+			return CheckTrailingTokens(p);
+		}
+	}
+
+	static CodeError ValidateSingleToken(const LexTree& node) {
+		TokenIter p(node.tokens);
+		++p;
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseBreak(const LexTree& node, Statement& out) {
+		if (auto error = CheckBreakable(node)) {
+			return error;
+		} else if (auto error = ValidateSingleToken(node)) {
+			return error;
+		}
+		stat::Break brk;
+		brk.finallyCount = BreakableTryExceptCount();
+		out.data = std::move(brk);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseContinue(const LexTree& node, Statement& out) {
+		if (auto error = CheckBreakable(node)) {
+			return error;
+		} else if (auto error = ValidateSingleToken(node)) {
+			return error;
+		}
+		stat::Continue cont;
+		cont.finallyCount = BreakableTryExceptCount();
+		out.data = std::move(cont);
+		return CodeError::Good();
+	}
+
+	static CodeError ParsePass(const LexTree& node, Statement& out) {
+		out.data = stat::Pass();
+		return ValidateSingleToken(node);
+	}
+
+	template <class StatType>
+	static CodeError ParseCapture(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (statementHierarchy.back() == StatIndex<stat::Root>()) {
+			return CodeError::Bad("Cannot capture at top level", (--p)->srcPos);
+		}
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a variable name", p->srcPos);
+		}
+
+		StatType stat{};
+		stat.name = p->text;
+		out.data = std::move(stat);
+		++p;
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseNonlocal(const LexTree& node, Statement& out) {
+		return ParseCapture<stat::NonLocal>(node, out);
+	}
+
+	static CodeError ParseGlobal(const LexTree& node, Statement& out) {
+		return ParseCapture<stat::Global>(node, out);
+	}
+
+	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		stat::Expr expr;
+		if (auto error = ParseExpression(p, expr.expr)) {
+			return error;
+		}
+		out.data = std::move(expr);
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseImportFrom(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a module name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a module name", p->srcPos);
+		}
+
+		stat::ImportFrom importFrom;
+		importFrom.module = p->text;
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected 'import'", (--p)->srcPos);
+		} else if (p->text != "import") {
+			return CodeError::Bad("Expected 'import'", p->srcPos);
+		}
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a name", (--p)->srcPos);
+		}
+		
+		if (p->text == "*") {
+			++p;
+		} else {
+			while (true) {
+				if (p->type != Token::Type::Word) {
+					return CodeError::Bad("Expected a name", p->srcPos);
+				}
+				importFrom.names.push_back(p->text);
+				++p;
+
+				if (p.EndReached()) {
+					break;
+				}
+
+				if (p->text == "as") {
+					++p;
+					if (p.EndReached()) {
+						return CodeError::Bad("Expected a name", (--p)->srcPos);
+					} else if (p->type != Token::Type::Word) {
+						return CodeError::Bad("Expected a name", p->srcPos);
+					}
+					importFrom.alias = p->text;
+					++p;
+					break;
+				}
+				
+				if (p->text == ",") {
+					++p;
+				} else {
+					return CodeError::Bad("Expected ','", p->srcPos);
+				}
+			}
+		}
+
+		out.data = std::move(importFrom);
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseImport(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+		
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a module name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a module name", p->srcPos);
+		}
+
+		stat::Import import;
+		import.module = p->text;
+		++p;
+
+		if (!p.EndReached() && p->text == "as") {
+			++p;
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected an alias name", (--p)->srcPos);
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Bad("Expected an alias name", p->srcPos);
+			}
+			import.alias = p->text;
+			++p;
+		}
+		
+		out.data = std::move(import);
+		return CheckTrailingTokens(p);
+	}
+
+	using ParseFn = CodeError(*)(const LexTree& node, Statement& out);
+
+	static const std::unordered_map<std::string, ParseFn> STATEMENT_STARTINGS = {
+		{ "if", ParseIf },
+		{ "elif", ParseElif },
+		{ "else", ParseElse },
+		{ "while", ParseWhile },
+		{ "for", ParseFor },
+		{ "break", ParseBreak },
+		{ "continue", ParseContinue },
+		{ "def", ParseDef },
+		{ "class", ParseClass },
+		{ "return", ParseReturn },
+		{ "pass", ParsePass },
+		{ "nonlocal", ParseNonlocal },
+		{ "global", ParseGlobal },
+		{ "try", ParseTry },
+		{ "except", ParseExcept },
+		{ "finally", ParseFinally },
+		{ "raise", ParseRaise },
+		{ "with", ParseWith },
+		{ "from", ParseImportFrom },
+		{ "import", ParseImport },
+	};
+
+	static CodeError ParseStatement(const LexTree& node, Statement& out) {
+		const auto& firstToken = node.tokens[0].text;
+		if (STATEMENT_STARTINGS.contains(firstToken)) {
+			if (auto error = STATEMENT_STARTINGS.at(firstToken)(node, out)) {
+				return error;
+			}
+		} else {
+			if (auto error = ParseExpressionStatement(node, out)) {
+				return error;
+			}
+		}
+
+		out.srcPos = node.tokens[0].srcPos;
+		return CodeError::Good();
+	}
+
+	void ExpandCompositeStatements(std::vector<Statement>& statements) {
+		auto get = [&](size_t i) {
+			return statements[i].GetIf<stat::Composite>();
+		};
+		
+		for (size_t i = 0; i < statements.size(); i++) {
+			if (auto* comp = get(i)) {
+				for (size_t j = 0; j < get(i)->body.size(); j++) {
+					auto& child = get(i)->body[j];
+					statements.insert(statements.begin() + i + j + 1, std::move(child));
+				}
+				statements.erase(statements.begin() + i);
+			}
+		}
+	}
+
+	template <class StatType>
+	static CodeError ParseBody(const LexTree& node, std::vector<Statement>& out) {
+		out.clear();
+
+		if (node.children.empty()) {
+			return CodeError::Bad("Expected a statement", node.tokens.back().srcPos);
+		}
+
+		statementHierarchy.push_back(StatIndex<StatType>());
+		for (auto& node : node.children) {
+			Statement statement;
+			if (auto error = ParseStatement(node, statement)) {
+				out.clear();
+				return error;
+			}
+			out.push_back(std::move(statement));
+		}
+		statementHierarchy.pop_back();
+
+		ExpandCompositeStatements(out);
+
+		// Validate elif and else
+		for (size_t i = 0; i < out.size(); i++) {
+			auto& stat = out[i];
+			size_t lastType = i ? out[i - 1].data.index() : 0;
+
+			if (stat.Is<stat::Elif>()) {
+				if (lastType != StatIndex<stat::If>() && lastType != StatIndex<stat::Elif>()) {
+					return CodeError::Bad(
+						"An 'elif' clause may only appear after an 'if' or 'elif' clause",
+						stat.srcPos
+					);
+				}
+			} else if (stat.Is<stat::Else>()) {
+				if (lastType != StatIndex<stat::If>() && lastType != StatIndex<stat::Elif>() && lastType != StatIndex<stat::While>()) {
+					return CodeError::Bad(
+						"An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause",
+						stat.srcPos
+					);
+				}
+			}
+		}
+
+		// Rearrange elif and else nodes
+		for (size_t i = 0; i < out.size(); i++) {
+			auto& cur = out[i];
+
+			std::optional<Statement> elseClause;
+			if (auto* elif = cur.GetIf<stat::Elif>()) {
+				// Transform elif into an else and if statement
+				stat::If ifStat;
+				ifStat.expr = std::move(elif->expr);
+				ifStat.body = std::move(elif->body);
+				ifStat.elseClause = std::move(elif->elseClause);
+				cur.data = std::move(ifStat);
+				
+				SourcePosition srcPos = cur.srcPos;
+				stat::Else elseStat;
+				elseStat.body.push_back(std::move(cur));
+				Statement stat;
+				stat.srcPos = srcPos;
+				stat.data = std::move(elseStat);
+				elseClause = std::move(stat);
+				out.erase(out.begin() + i);
+				i--;
+			} else if (cur.Is<stat::Else>()) {
+				elseClause = std::move(cur);
+				out.erase(out.begin() + i);
+				i--;
+			}
+
+			if (elseClause) {
+				auto getElse = [](Statement* parent) -> stat::Else* {
+					std::unique_ptr<Statement>* els = nullptr;
+					if (auto* ifStat = parent->GetIf<stat::If>()) {
+						if (ifStat->elseClause)
+							els = &ifStat->elseClause;
+					} else if (auto* elif = parent->GetIf<stat::Elif>()) {
+						if (elif->elseClause)
+							els = &elif->elseClause;
+					} else if (auto* wh = parent->GetIf<stat::While>()) {
+						if (wh->elseClause)
+							els = &wh->elseClause;
+					} else {
+						return nullptr;
+					}
+					return els ? &(*els)->Get<stat::Else>() : nullptr;
+				};
+
+				Statement* parent = &out[i];
+				while (auto* els = getElse(parent)) {
+					parent = &els->body.back();
+				}
+				
+				auto els = std::make_unique<Statement>(std::move(elseClause.value()));
+				if (auto* ifStat = parent->GetIf<stat::If>()) {
+					ifStat->elseClause = std::move(els);
+				} else if (auto* elif = parent->GetIf<stat::Elif>()) {
+					elif->elseClause = std::move(els);
+				} else if (auto* wh = parent->GetIf<stat::While>()) {
+					wh->elseClause = std::move(els);
+				} else {
+					WG_UNREACHABLE();
+				}
+			}
+		}
+
+		for (size_t i = 0; i < out.size(); i++) {
+			SourcePosition srcPos = out[i].srcPos;
+			switch (out[i].data.index()) {
+			case StatIndex<stat::Except>():
+				return CodeError::Bad("An 'except' clause may only appear after a 'try' or 'except' clause", srcPos);
+			case StatIndex<stat::Finally>():
+				return CodeError::Bad("A 'finally' clause may only appear after a 'try' or 'except' clause", srcPos);
+			case StatIndex<stat::Try>(): {
+				auto& tryStat = out[i].Get<stat::Try>();
+				
+				for (i++; i < out.size(); i++) {
+					auto& cur = out[i];
+					srcPos = cur.srcPos;
+					
+					if (cur.Is<stat::Except>()) {
+						auto& exceptClauses = tryStat.exceptBlocks;
+						if (!exceptClauses.empty() && !exceptClauses.back().Get<stat::Except>().type) {
+							return CodeError::Bad("Default 'except' clause must be last", srcPos);
+						}
+						exceptClauses.push_back(std::move(cur));
+						out.erase(out.begin() + i);
+						i--;
+						continue;
+					} else if (auto* fin = cur.GetIf<stat::Finally>()) {
+						tryStat.finallyBody = std::move(fin->body);
+						out.erase(out.begin() + i);
+						i--;
+					}
+					break;
+				}
+				
+				if (tryStat.exceptBlocks.empty() && tryStat.finallyBody.empty()) {
+					return CodeError::Bad("Expected an 'except' or 'finally' clause", srcPos);
+				}
+				i--;
+			}
+			}
+		}
+
+		return CodeError::Good();
+	}
+
+	ParseResult Parse(const LexTree& lexTree) {
+		if (lexTree.children.empty())
+			return {};
+
+		statementHierarchy.clear();
+		stat::Root root;
+		auto error = ParseBody<stat::Root>(lexTree, root.expr.def.body);
+		statementHierarchy.clear();
+		
+		ResolveCaptures(root.expr);
+		root.expr.def.variables.merge(root.expr.def.localCaptures);
+		root.expr.def.localCaptures.clear();
+
+		ParseResult result{};
+		result.error = std::move(error);
+		result.parseTree = std::move(root);
+		return result;
+	}
+}
+
+
+namespace wings {
+	bool ImportRandom(Wg_Context* context);
+}
+
+
+#include <random>
+
+namespace wings {
+	namespace randommodule {
+		static constexpr const char* RAND_CODE = R"(
+def choice(seq):
+	t = tuple(seq)
+	return t[randint(0, len(t) - 1)]
+
+def getrandbits(n):
+	x = 0
+	for i in range(n):
+		x <<= 1
+		if random() < 0.5:
+			x |= 1
+	return x
+
+def randrange(*args):
+	return choice(range(*args))
+		)";
+
+		static Wg_Obj* randint(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_INT(0);
+			WG_EXPECT_ARG_TYPE_INT(1);
+			Wg_int lower = Wg_GetInt(argv[0]);
+			Wg_int upper = Wg_GetInt(argv[1]);
+			return Wg_NewInt(context, context->rng.Int(lower, upper));
+		}
+
+		static Wg_Obj* random(Wg_Context* context, Wg_Obj**, int argc) {
+			WG_EXPECT_ARG_COUNT(0);
+			return Wg_NewFloat(context, context->rng.Rand());
+		}
+
+		static Wg_Obj* seed(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT(0);
+			context->rng.Seed(Wg_GetInt(argv[0]));
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* shuffle(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_LIST(0);
+			auto& li = argv[0]->Get<std::vector<Wg_Obj*>>();
+			std::shuffle(li.begin(), li.end(), context->rng.Engine());
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* uniform(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+			Wg_float lower = Wg_GetFloat(argv[0]);
+			Wg_float upper = Wg_GetFloat(argv[1]);
+			if (lower > upper) {
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "Lower bound must be less than or equal to upper bound");
+				return nullptr;
+			}
+			return Wg_NewFloat(context, context->rng.Float(lower, upper));
+		}
+	}
+
+	bool ImportRandom(Wg_Context* context) {
+		using namespace randommodule;
+		try {
+			RegisterFunction(context, "seed", seed);
+			RegisterFunction(context, "shuffle", shuffle);
+			RegisterFunction(context, "randint", randint);
+			RegisterFunction(context, "random", random);
+			RegisterFunction(context, "uniform", uniform);
+
+			if (!Execute(context, RAND_CODE, "random"))
+				throw LibraryInitException();
+			
+			return true;
+		} catch (LibraryInitException&) {
+			return false;
+		}
+	}
+}
+
+
+namespace wings {
+	bool ImportSys(Wg_Context* context);
+}
+
+
+namespace wings {
+	namespace sysmodule {
+		static Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
+			Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
+			return nullptr;
+		}
+	}
+	
+	bool ImportSys(Wg_Context* context) {
+		using namespace sysmodule;
+		try {
+			Wg_Obj* list = Wg_NewList(context);
+			if (list == nullptr)
+				return false;
+			Wg_SetGlobal(context, "argv", list);
+
+			if (context->argv.empty()) {
+				context->argv.push_back("");
+			}
+
+			for (const std::string& arg : context->argv) {
+				Wg_Obj* str = Wg_NewString(context, arg.c_str());
+				if (str == nullptr)
+					return false;
+				if (Wg_CallMethod(list, "append", &str, 1) == nullptr)
+					return false;
+			}
+
+			RegisterFunction(context, "exit", exit);
+			return true;
+		} catch (LibraryInitException&) {
+			return false;
+		}
+	}
+}
+
+
+namespace wings {
+	bool ImportTime(Wg_Context* context);
+}
+
+
+#include <chrono>
+#include <thread>
+
+namespace wings {
+	namespace timemodule {
+		static Wg_Obj* sleep(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			Wg_float secs = Wg_GetFloat(argv[0]);
+			int ms = (int)(secs * 1000);
+			std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* time(Wg_Context* context, Wg_Obj**, int argc) {
+			WG_EXPECT_ARG_COUNT(0);
+			auto now = std::chrono::system_clock::now();
+			auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+			auto value = now_ms.time_since_epoch();
+			return Wg_NewFloat(context, (Wg_float)value.count() / 1000);
+		}
+	}
+	
+	bool ImportTime(Wg_Context* context) {
+		using namespace timemodule;
+		try {
+			RegisterFunction(context, "time", time);
+			RegisterFunction(context, "sleep", sleep);
+			
+			return true;
+		} catch (LibraryInitException&) {
+			return false;
+		}
+	}
+}
+
+
+
+#include <iostream>
+#include <memory>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <string_view>
+#include <sstream>
+#include <queue>
+#include <unordered_set>
+#include <cstring>
+
+namespace wings {
+	static bool ReadFromFile(const std::string& path, std::string& data) {
+		std::ifstream f(path);
+		if (!f.is_open())
+			return false;
+
+		std::stringstream buffer;
+		buffer << f.rdbuf();
+
+		if (!f)
+			return false;
+
+		data = buffer.str();
+		return true;
+	}
+
+	static bool LoadFileModule(Wg_Context* context, const std::string& module) {
+		std::string path = context->importPath + module + ".py";
+		std::string source;
+		if (!ReadFromFile(path, source)) {
+			std::string msg = std::string("No module named '") + module + "'";
+			Wg_RaiseException(context, WG_EXC_IMPORTERROR, msg.c_str());
+			return false;
+		}
+
+		Wg_Obj* fn = Compile(context, source.c_str(), module.c_str(), module.c_str(), false);
+		if (fn == nullptr)
+			return false;
+
+		return Wg_Call(fn, nullptr, 0) != nullptr;
+	}
+
+	static bool LoadModule(Wg_Context* context, const std::string& name) {
+		if (!context->globals.contains(name)) {
+			bool success{};
+			context->globals.insert({ std::string(name), {} });
+			context->currentModule.push(name);
+
+			if (name != "__builtins__")
+				Wg_ImportAllFromModule(context, "__builtins__");
+
+			auto it = context->moduleLoaders.find(name);
+			if (it != context->moduleLoaders.end()) {
+				success = it->second(context);
+			} else {
+				success = LoadFileModule(context, name);
+			}
+
+			context->currentModule.pop();
+			if (!success) {
+				context->globals.erase(name);
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
+extern "C" {
+	void Wg_DefaultConfig(Wg_Config* config) {
+		WG_ASSERT_VOID(config);
+		config->maxAlloc = 1'000'000;
+		config->maxRecursion = 50;
+		config->gcRunFactor = 20.0f;
+		config->printUserdata = nullptr;
+		config->argv = nullptr;
+		config->argc = 0;
+		config->enableOSAccess = false;
+		config->print = [](const char* message, int len, void*) {
+			std::cout << std::string_view(message, (size_t)len);
+		};
+	}
+
+	Wg_Context* Wg_CreateContext(const Wg_Config* config) {
+		Wg_Context* context = new Wg_Context();
+		
+		context->currentModule.push("__main__");
+		context->globals.insert({ std::string("__main__"), {} });
+
+		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
+		Wg_RegisterModule(context, "dis", wings::ImportDis);
+		Wg_RegisterModule(context, "math", wings::ImportMath);
+		Wg_RegisterModule(context, "random", wings::ImportRandom);
+		Wg_RegisterModule(context, "sys", wings::ImportSys);
+		Wg_RegisterModule(context, "time", wings::ImportTime);
+
+		// Initialise the library without restriction
+		Wg_DefaultConfig(&context->config);
+		if (config)
+			context->config.enableOSAccess = config->enableOSAccess;
+		Wg_ImportAllFromModule(context, "__builtins__");
+		
+		if (config) {
+			WG_ASSERT(context);
+			WG_ASSERT(config->maxAlloc >= 0);
+			WG_ASSERT(config->maxRecursion >= 0);
+			WG_ASSERT(config->gcRunFactor >= 1.0f);
+			WG_ASSERT(config->argc >= 0);
+			if (config->argc) {
+				WG_ASSERT(config->argv);
+				for (int i = 0; i < config->argc; i++)
+					WG_ASSERT(config->argv[i]);
+			}
+
+			if (config->importPath) {
+				context->importPath = config->importPath;
+				if (config->importPath[0] != '/' && config->importPath[0] != '\\')
+					context->importPath += "/";
+			}
+
+			context->config = *config;
+		}
+		
+		if (context->config.enableOSAccess) {
+			Wg_RegisterModule(context, "os", wings::ImportOS);
+		}
+		
+		for (int i = 0; i < context->config.argc; i++) {
+			context->argv.push_back(context->config.argv[i]);
+		}
+		
+		return context;
+	}
+
+	void Wg_DestroyContext(Wg_Context* context) {
+		WG_ASSERT_VOID(context);
+		context->closing = true;
+		Wg_CollectGarbage(context);
+		delete context;
+	}
+
+	void Wg_Print(const Wg_Context* context, const char* message, int len) {
+		WG_ASSERT_VOID(context && message);
+		if (context->config.print) {
+			context->config.print(len ? message : "", len, context->config.printUserdata);
+		}
+	}
+
+	void Wg_PrintString(const Wg_Context* context, const char* message) {
+		WG_ASSERT_VOID(context && message);
+		Wg_Print(context, message, (int)std::strlen(message));
+	}
+
+	void Wg_SetErrorCallback(Wg_ErrorCallback callback) {
+		wings::errorCallback = callback;
+	}
+
+	Wg_Obj* Wg_Compile(Wg_Context* context, const char* script, const char* prettyName) {
+		return wings::Compile(context, script, "__main__", prettyName, false);
+	}
+
+	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* script, const char* prettyName) {
+		return wings::Compile(context, script, "__main__", prettyName, true);
+	}
+
+	bool Wg_Execute(Wg_Context* context, const char* script, const char* prettyName) {
+		if (Wg_Obj* fn = Wg_Compile(context, script, prettyName)) {
+			return Wg_Call(fn, nullptr, 0) != nullptr;
+		}
+		return false;
+	}
+	
+	Wg_Obj* Wg_ExecuteExpression(Wg_Context* context, const char* script, const char* prettyName) {
+		if (Wg_Obj* fn = Wg_CompileExpression(context, script, prettyName)) {
+			return Wg_Call(fn, nullptr, 0);
+		}
+		return nullptr;
+	}
+
+	Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
+		WG_ASSERT(context && name && wings::IsValidIdentifier(name));
+		auto module = std::string(context->currentModule.top());
+		auto& globals = context->globals.at(module);
+		auto it = globals.find(name);
+		if (it == globals.end()) {
+			return nullptr;
+		} else {
+			return *it->second;
+		}
+	}
+
+	void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value) {
+		WG_ASSERT_VOID(context && name && value && wings::IsValidIdentifier(name));
+		const auto& module = std::string(context->currentModule.top());
+		auto& globals = context->globals.at(module);
+		auto it = globals.find(name);
+		if (it != globals.end()) {
+			*it->second = value;
+		} else {
+			globals.insert({ std::string(name), wings::MakeRcPtr<Wg_Obj*>(value) });
+		}
+	}
+
+	void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
+		WG_ASSERT_VOID(context && name && loader && wings::IsValidIdentifier(name));
+		context->moduleLoaders.insert({ std::string(name), loader });
+	}
+
+	Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* module, const char* alias) {
+		WG_ASSERT(context && module && wings::IsValidIdentifier(module));
+		if (alias) {
+			WG_ASSERT(wings::IsValidIdentifier(alias));
+		} else {
+			alias = module;
+		}
+
+		if (!wings::LoadModule(context, module))
+			return nullptr;
+
+		Wg_Obj* moduleObject = Wg_Call(context->builtins.moduleObject, nullptr, 0);
+		if (moduleObject == nullptr)
+			return nullptr;
+		auto& mod = context->globals.at(module);
+		for (auto& [var, val] : mod) {
+			Wg_SetAttribute(moduleObject, var.c_str(), *val);
+		}
+		Wg_SetGlobal(context, alias, moduleObject);
+		return moduleObject;
+	}
+
+	Wg_Obj* Wg_ImportFromModule(Wg_Context* context, const char* module, const char* name, const char* alias) {
+		WG_ASSERT(context && module && name && wings::IsValidIdentifier(module));
+		if (alias) {
+			WG_ASSERT(wings::IsValidIdentifier(alias));
+		} else {
+			alias = name;
+		}
+
+		if (!wings::LoadModule(context, module))
+			return nullptr;
+
+		auto& mod = context->globals.at(module);
+		auto it = mod.find(name);
+		if (it == mod.end()) {
+			std::string msg = std::string("Cannot import '") + name
+				+ "' from '" + module + "'";
+			Wg_RaiseException(context, WG_EXC_IMPORTERROR, msg.c_str());
+			return nullptr;
+		}
+
+		Wg_SetGlobal(context, alias, *it->second);
+		return *it->second;
+	}
+
+	bool Wg_ImportAllFromModule(Wg_Context* context, const char* module) {
+		WG_ASSERT(context && module && wings::IsValidIdentifier(module));
+
+		if (!wings::LoadModule(context, module))
+			return false;
+
+		auto& mod = context->globals.at(module);
+		for (auto& [var, val] : mod) {
+			Wg_SetGlobal(context, var.c_str(), *val);
+		}
+		return true;
+	}
+
+	Wg_Obj* Wg_None(Wg_Context* context) {
+		WG_ASSERT(context);
+		return context->builtins.none;
+	}
+
+	Wg_Obj* Wg_NewBool(Wg_Context* context, bool value) {
+		WG_ASSERT(context);
+		if (value && context->builtins._true) {
+			return context->builtins._true;
+		} else if (!value && context->builtins._false) {
+			return context->builtins._false;
+		} else {
+			return value ? context->builtins._true : context->builtins._false;
+		}
+	}
+
+	Wg_Obj* Wg_NewInt(Wg_Context* context, Wg_int value) {
+		WG_ASSERT(context);
+		if (Wg_Obj* v = Wg_Call(context->builtins._int, nullptr, 0)) {
+			v->Get<Wg_int>() = value;
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_NewFloat(Wg_Context* context, Wg_float value) {
+		WG_ASSERT(context);
+		if (Wg_Obj* v = Wg_Call(context->builtins._float, nullptr, 0)) {
+			v->Get<Wg_float>() = value;
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_NewString(Wg_Context* context, const char* value) {
+		WG_ASSERT(context);
+		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
+			v->Get<std::string>() = value ? value : "";
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_NewStringBuffer(Wg_Context* context, const char* buffer, int length) {
+		WG_ASSERT(context && buffer && length >= 0);
+		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
+			v->Get<std::string>() = std::string(buffer, length);
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_NewTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WG_ASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WG_ASSERT(argv);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(argv[i]);
+				WG_ASSERT(argv[i]);
+			}
+		}
+
+		if (Wg_Obj* v = Wg_Call(context->builtins.tuple, nullptr, 0)) {
+			v->Get<std::vector<Wg_Obj*>>() = std::vector<Wg_Obj*>(argv, argv + argc);
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_NewList(Wg_Context* context, Wg_Obj** argv, int argc) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WG_ASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WG_ASSERT(argv);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(argv[i]);
+				WG_ASSERT(argv[i]);
+			}
+		}
+
+		if (Wg_Obj* v = Wg_Call(context->builtins.list, nullptr, 0)) {
+			v->Get<std::vector<Wg_Obj*>>() = std::vector<Wg_Obj*>(argv, argv + argc);
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_NewDictionary(Wg_Context* context, Wg_Obj** keys, Wg_Obj** values, int argc) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WG_ASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WG_ASSERT(keys && values);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(keys[i]);
+				refs.emplace_back(values[i]);
+				WG_ASSERT(keys[i] && values[i]);
+			}
+		}
+
+		// Pass a dummy kwargs to prevent stack overflow from recursion
+		Wg_Obj* dummyKwargs = wings::Alloc(context);
+		if (dummyKwargs == nullptr)
+			return nullptr;
+		dummyKwargs->type = "__map";
+		wings::WDict wd{};
+		dummyKwargs->data = &wd;
+
+		if (Wg_Obj* v = Wg_Call(context->builtins.dict, nullptr, 0, dummyKwargs)) {
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(v);
+				try {
+					v->Get<wings::WDict>()[keys[i]] = values[i];
+				} catch (wings::HashException&) {
+					return nullptr;
+				}
+			}
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_NewSet(Wg_Context* context, Wg_Obj** argv, int argc) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WG_ASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WG_ASSERT(argv);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(argv[i]);
+				WG_ASSERT(argv[i]);
+			}
+		}
+
+		if (Wg_Obj* v = Wg_Call(context->builtins.set, nullptr, 0, nullptr)) {
+			for (int i = 0; i < argc; i++) {
+				try {
+					v->Get<wings::WSet>().insert(argv[i]);
+				} catch (wings::HashException&) {
+					return nullptr;
+				}
+			}
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_NewFunction(Wg_Context* context, Wg_Function fptr, void* userdata, const char* prettyName) {
+		WG_ASSERT(context && fptr);
+
+		Wg_Obj* obj = wings::Alloc(context);
+		if (obj == nullptr)
+			return nullptr;
+
+		obj->attributes = context->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+		obj->type = "__func";
+		auto data = new Wg_Obj::Func;
+		Wg_SetUserdata(obj, data);
+		Wg_RegisterFinalizer(obj, [](void* ud) { delete (Wg_Obj::Func*)ud; }, data);
+
+		data->fptr = fptr;
+		data->userdata = userdata;
+		data->isMethod = false;
+		data->module = context->currentModule.top();
+		data->prettyName = prettyName ? prettyName : wings::DEFAULT_FUNC_NAME;
+		data->self = nullptr;
+
+		return obj;
+	}
+
+	Wg_Obj* Wg_BindMethod(Wg_Obj* klass, const char* name, Wg_Function fptr, void* userdata) {
+		WG_ASSERT(klass && fptr && Wg_IsClass(klass));
+		Wg_Context* context = klass->context;
+		wings::Wg_ObjRef ref(klass);
+		Wg_Obj* fn = Wg_NewFunction(context, fptr, userdata, name);
+		if (fn == nullptr)
+			return nullptr;
+		fn->Get<Wg_Obj::Func>().isMethod = true;
+		klass->Get<Wg_Obj::Class>().instanceAttributes.Set(name, fn);
+		return fn;
+	}
+
+	Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int basesLen) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WG_ASSERT(context && name && basesLen >= 0);
+		if (basesLen > 0) {
+			WG_ASSERT(bases);
+			for (int i = 0; i < basesLen; i++) {
+				WG_ASSERT(bases[i] && Wg_IsClass(bases[i]));
+				refs.emplace_back(bases[i]);
+			}
+		}
+
+		// Allocate class
+		Wg_Obj* klass = wings::Alloc(context);
+		if (klass == nullptr) {
+			return nullptr;
+		}
+		refs.emplace_back(klass);
+		klass->type = "__class";
+		klass->data = new Wg_Obj::Class{ std::string(name) };
+		Wg_RegisterFinalizer(klass, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass->data);
+		klass->Get<Wg_Obj::Class>().module = context->currentModule.top();
+		klass->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", klass);
+		klass->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
+
+		// Set bases
+		int actualBaseCount = basesLen ? basesLen : 1;
+		Wg_Obj** actualBases = basesLen ? bases : &context->builtins.object;
+		for (int i = 0; i < actualBaseCount; i++) {
+			klass->Get<Wg_Obj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<Wg_Obj::Class>().instanceAttributes);
+			klass->Get<Wg_Obj::Class>().bases.push_back(actualBases[i]);
+		}
+		if (Wg_Obj* basesTuple = Wg_NewTuple(context, actualBases, actualBaseCount)) {
+			klass->attributes.Set("__bases__", basesTuple);
+		} else {
+			return nullptr;
+		}
+
+		// Set construction function. This function forwards to __init__().
+		klass->Get<Wg_Obj::Class>().userdata = klass;
+		klass->Get<Wg_Obj::Class>().ctor = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
+			Wg_Obj* _classObj = (Wg_Obj*)Wg_GetFunctionUserdata(context);
+
+			Wg_Obj* instance = wings::Alloc(context);
+			if (instance == nullptr)
+				return nullptr;
+			wings::Wg_ObjRef ref(instance);
+
+			instance->attributes = _classObj->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			instance->type = _classObj->Get<Wg_Obj::Class>().name;
+
+			if (Wg_HasAttribute(instance, "__init__")) {
+				Wg_Obj* init = Wg_GetAttribute(instance, "__init__");
+				if (init == nullptr)
+					return nullptr;
+
+				if (Wg_IsFunction(init)) {
+					Wg_Obj* kwargs = Wg_GetKwargs(context);
+					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
+					if (ret == nullptr) {
+						return nullptr;
+					} else if (!Wg_IsNone(ret)) {
+						Wg_RaiseException(context, WG_EXC_TYPEERROR, "__init__() returned a non NoneType type");
+						return nullptr;
+					}
+				}
+			}
+
+			return instance;
+		};
+
+		// Set init method
+		auto init = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
+			Wg_Obj* klass = (Wg_Obj*)Wg_GetFunctionUserdata(context);
+			if (argc < 1) {
+				Wg_RaiseArgumentCountError(klass->context, argc, -1);
+				return nullptr;
+			}
+
+			const auto& bases = klass->Get<Wg_Obj::Class>().bases;
+			if (bases.empty())
+				return nullptr;
+
+			if (Wg_Obj* baseInit = Wg_GetAttributeFromBase(argv[0], "__init__", bases[0])) {
+				Wg_Obj* kwargs = Wg_GetKwargs(context);
+				Wg_Obj* ret = Wg_Call(baseInit, argv + 1, argc - 1, kwargs);
+				if (ret == nullptr) {
+					return nullptr;
+				} else if (!Wg_IsNone(ret)) {
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "__init__() returned a non NoneType type");
+					return nullptr;
+				}
+			}
+
+			return Wg_None(context);
+		};
+		std::string initName = std::string(name) + ".__init__";
+
+		wings::Wg_ObjRef ref(klass);
+		Wg_Obj* initFn = Wg_BindMethod(klass, initName.c_str(), init, klass);
+		if (initFn == nullptr)
+			return nullptr;
+
+		Wg_IncRef(klass);
+		Wg_RegisterFinalizer(initFn, [](void* ud) { Wg_DecRef((Wg_Obj*)ud); }, klass);
+
+		return klass;
+	}
+
+	bool Wg_IsNone(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj == obj->context->builtins.none;
+	}
+
+	bool Wg_IsBool(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj == obj->context->builtins._true
+			|| obj == obj->context->builtins._false;
+	}
+
+	bool Wg_IsInt(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__int";
+	}
+
+	bool Wg_IsIntOrFloat(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__int" || obj->type == "__float";
+	}
+
+	bool Wg_IsString(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__str";
+	}
+
+	bool Wg_IsTuple(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__tuple";
+	}
+
+	bool Wg_IsList(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__list";
+	}
+
+	bool Wg_IsDictionary(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__map";
+	}
+
+	bool Wg_IsSet(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__set";
+	}
+
+	bool Wg_IsClass(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__class";
+	}
+
+	bool Wg_IsFunction(const Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->type == "__func";
+	}
+
+	bool Wg_GetBool(const Wg_Obj* obj) {
+		WG_ASSERT(obj && Wg_IsBool(obj));
+		return obj->Get<bool>();
+	}
+
+	Wg_int Wg_GetInt(const Wg_Obj* obj) {
+		WG_ASSERT(obj && Wg_IsInt(obj));
+		return obj->Get<Wg_int>();
+	}
+
+	Wg_float Wg_GetFloat(const Wg_Obj* obj) {
+		WG_ASSERT(obj && Wg_IsIntOrFloat(obj));
+		if (Wg_IsInt(obj)) return (Wg_float)obj->Get<Wg_int>();
+		else return obj->Get<Wg_float>();
+	}
+
+	const char* Wg_GetString(const Wg_Obj* obj, int* len) {
+		WG_ASSERT(obj && Wg_IsString(obj));
+		const auto& s = obj->Get<std::string>();
+		if (len)
+			*len = (int)s.size();
+		return s.c_str();
+	}
+
+	void Wg_SetUserdata(Wg_Obj* obj, void* userdata) {
+		WG_ASSERT_VOID(obj);
+		obj->data = userdata;
+	}
+
+	bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out) {
+		WG_ASSERT(obj && type);
+		if (obj->type == std::string(type)) {
+			if (out)
+				*out = obj->data;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata) {
+		WG_ASSERT_VOID(obj && finalizer);
+		obj->finalizers.push_back({ finalizer, userdata });
+	}
+	
+	static Wg_Obj* DuplicateMethod(Wg_Obj* method, Wg_Obj* self) {
+		const auto& func = method->Get<Wg_Obj::Func>();
+		if (func.self == self) {
+			return method;
+		}
+		
+		wings::Wg_ObjRef ref(method);
+		wings::Wg_ObjRef ref2(self);
+		
+		Wg_Obj* dup = Wg_NewFunction(
+			method->context,
+			func.fptr,
+			func.userdata,
+			func.prettyName.c_str());
+		if (dup) {
+			dup->Get<Wg_Obj::Func>().self = self;
+		}
+		
+		return dup;
+	}
+
+	bool Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
+		return Wg_GetAttributeNoExcept(obj, attribute) != nullptr;
+	}
+
+	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute) {
+		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
+		Wg_Obj* mem = obj->attributes.Get(attribute);
+		if (mem == nullptr) {
+			Wg_RaiseAttributeError(obj, attribute);
+		} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+			return DuplicateMethod(mem, obj);
+		}
+		return mem;
+	}
+
+	Wg_Obj* Wg_GetAttributeNoExcept(Wg_Obj* obj, const char* attribute) {
+		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
+		return obj->attributes.Get(attribute);
+	}
+
+	void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value) {
+		WG_ASSERT_VOID(obj && attribute && value && wings::IsValidIdentifier(attribute));
+		obj->attributes.Set(attribute, value);
+	}
+
+	Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* attribute, Wg_Obj* baseClass) {
+		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
+
+		Wg_Obj* mem{};
+		if (baseClass == nullptr) {
+			mem = obj->attributes.GetFromBase(attribute);
+		} else {
+			mem = baseClass->Get<Wg_Obj::Class>().instanceAttributes.Get(attribute);
+		}
+
+		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+			mem->Get<Wg_Obj::Func>().self = obj;
+		}
+		return mem;
+	}
+
+	Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj* const* types, int typesLen) {
+		WG_ASSERT(instance && typesLen >= 0 && (types || typesLen == 0));
+		for (int i = 0; i < typesLen; i++)
+			WG_ASSERT(types[i] && Wg_IsClass(types[i]));
+
+		// Cannot use Wg_HasAttribute here because instance is a const pointer
+		Wg_Obj* klass = instance->attributes.Get("__class__");
+		if (klass == nullptr)
+			return nullptr;
+		wings::Wg_ObjRef ref(klass);
+
+		std::queue<wings::Wg_ObjRef> toCheck;
+		toCheck.emplace(klass);
+
+		while (!toCheck.empty()) {
+			auto end = types + typesLen;
+			auto it = std::find(types, end, toCheck.front().Get());
+			if (it != end)
+				return *it;
+
+			Wg_Obj* bases = Wg_GetAttributeNoExcept(toCheck.front().Get(), "__bases__");
+			if (bases && Wg_IsTuple(bases))
+				for (Wg_Obj* base : bases->Get<std::vector<Wg_Obj*>>())
+					toCheck.emplace(base);
+
+			toCheck.pop();
+		}
+		return nullptr;
+	}
+
+	bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback callback) {
+		WG_ASSERT(obj && callback);
+		Wg_Context* context = obj->context;
+
+		wings::Wg_ObjRef objRef(obj);
+
+		Wg_Obj* iter = Wg_CallMethod(obj, "__iter__", nullptr, 0);
+		if (iter == nullptr)
+			return false;
+		wings::Wg_ObjRef iterRef(iter);
+
+		while (true) {
+			Wg_Obj* yielded = Wg_CallMethod(iter, "__next__", nullptr, 0);
+
+			Wg_Obj* exc = Wg_GetException(context);
+			if (exc) {
+				if (Wg_IsInstance(exc, &context->builtins.stopIteration, 1)) {
+					Wg_ClearException(context);
+					return true;
+				} else {
+					return false;
+				}
+			}
+
+			WG_ASSERT(yielded); // If no exception was thrown then a value must be yielded
+			wings::Wg_ObjRef yieldedRef(yielded);
+			if (!callback(yielded, userdata))
+				return Wg_GetException(context) == nullptr;
+
+			if (Wg_GetException(context))
+				return false;
+		}
+	}
+
+	bool Wg_Unpack(Wg_Obj* obj, int count, Wg_Obj** out) {
+		WG_ASSERT(obj && (count == 0 || out));
+
+		Wg_Context* context = obj->context;
+		struct State {
+			Wg_Context* context;
+			Wg_Obj** array;
+			int count;
+			int index;
+		} s = { context, out, count, 0 };
+
+		bool success = Wg_Iterate(obj, &s, [](Wg_Obj* yielded, void* userdata) {
+			State* s = (State*)userdata;
+			if (s->index >= s->count) {
+				Wg_RaiseException(s->context, WG_EXC_VALUEERROR, "Too many values to unpack");
+			} else {
+				Wg_IncRef(yielded);
+				s->array[s->index] = yielded;
+				s->index++;
+			}
+			return true;
+			});
+
+		for (int i = s.index; i; i--)
+			Wg_DecRef(out[i - 1]);
+
+		if (!success) {
+			return false;
+		} else if (s.index < count) {
+			Wg_RaiseException(context, WG_EXC_VALUEERROR, "Not enough values to unpack");
+			return false;
+		} else {
+			return true;
+		}
+	}
+
+	Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
+		WG_ASSERT(context && !context->kwargs.empty());
+		return context->kwargs.back();
+	}
+
+	void* Wg_GetFunctionUserdata(Wg_Context* context) {
+		WG_ASSERT(context && !context->kwargs.empty());
+		return context->userdata.back();
+	}
+
+	Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
+		WG_ASSERT(callable && argc >= 0 && (argc == 0 || argv));
+		if (argc)
+			WG_ASSERT(argv);
+		for (int i = 0; i < argc; i++)
+			WG_ASSERT(argv[i]);
+
+		Wg_Context* context = callable->context;
+		
+		// Check recursion limit
+		if (context->kwargs.size() >= (size_t)context->config.maxRecursion) {
+			Wg_RaiseException(context, WG_EXC_RECURSIONERROR);
+			return nullptr;
+		}
+
+		// Call the __call__ method if object is neither a function nor a class
+		if (!Wg_IsFunction(callable) && !Wg_IsClass(callable)) {
+			return Wg_CallMethod(callable, "__call__", argv, argc);
+		}
+
+		// Validate keyword arguments
+		if (kwargsDict) {
+			if (!Wg_IsDictionary(kwargsDict)) {
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments must be a dictionary");
+				return nullptr;
+			}
+			for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
+				if (!Wg_IsString(key)) {
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments dictionary must only contain string keys");
+					return nullptr;
+				}
+			}
+		}
+
+		// Prevent arguments from being garbage collected
+		std::vector<wings::Wg_ObjRef> refs;
+		refs.emplace_back(callable);
+		for (int i = 0; i < argc; i++)
+			refs.emplace_back(argv[i]);
+
+		// Get the raw function pointer, userdata, module, and self
+		// depending on whether the callable is a function or class.
+		Wg_Obj* (*fptr)(Wg_Context*, Wg_Obj**, int);
+		void* userdata = nullptr;
+		std::string_view module;
+		Wg_Obj* self = nullptr;
+		if (Wg_IsFunction(callable)) {
+			const auto& func = callable->Get<Wg_Obj::Func>();
+			if (func.self)
+				self = func.self;
+			fptr = func.fptr;
+			userdata = func.userdata;
+			module = func.module;
+		} else {
+			const auto& klass = callable->Get<Wg_Obj::Class>();
+			fptr = klass.ctor;
+			userdata = klass.userdata;
+			module = klass.module;
+		}
+
+		// Prepare arguments into a contiguous buffer
+		std::vector<Wg_Obj*> argsWithSelf;
+		if (self) {
+			argsWithSelf.push_back(self);
+			refs.emplace_back(self);
+		}
+		argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
+
+		// Push various data onto stacks
+		context->currentModule.push(module);
+		context->userdata.push_back(userdata);
+		context->kwargs.push_back(kwargsDict);
+		if (Wg_IsFunction(callable)) {
+			const auto& func = callable->Get<Wg_Obj::Func>();
+			context->currentTrace.push_back(wings::TraceFrame{
+				{},
+				"",
+				func.module,
+				func.prettyName
+				});
+		}
+		
+		// Perform the call
+		Wg_Obj* ret = nullptr;
+		try {
+			ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
+		} catch (std::bad_alloc&) {
+			Wg_RaiseException(context, WG_EXC_MEMORYERROR);
+		}
+		
+		// Pop the data off the stacks
+		context->currentModule.pop();
+		context->userdata.pop_back();
+		context->kwargs.pop_back();
+		if (Wg_IsFunction(callable)) {
+			context->currentTrace.pop_back();
+		}
+
+		return ret;
+	}
+
+	Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
+		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
+		if (argc)
+			WG_ASSERT(argv);
+		for (int i = 0; i < argc; i++)
+			WG_ASSERT(argv[i]);
+
+		if (Wg_Obj* method = Wg_GetAttribute(obj, member)) {
+			return Wg_Call(method, argv, argc, kwargsDict);
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict, Wg_Obj* baseClass) {
+		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
+		if (argc)
+			WG_ASSERT(argv);
+		for (int i = 0; i < argc; i++)
+			WG_ASSERT(argv[i]);
+
+		if (Wg_Obj* method = Wg_GetAttributeFromBase(obj, member, baseClass)) {
+			return Wg_Call(method, argv, argc, kwargsDict);
+		} else {
+			Wg_RaiseAttributeError(obj, member);
+			return nullptr;
+		}
+	}
+
+	bool Wg_ParseKwargs(Wg_Obj* kwargs, const char* const* keys, int count, Wg_Obj** out) {
+		WG_ASSERT(keys && out && count > 0 && (!kwargs || Wg_IsDictionary(kwargs)));
+
+		if (kwargs == nullptr) {
+			for (int i = 0; i < count; i++)
+				out[i] = nullptr;
+			return true;
+		}
+
+		wings::Wg_ObjRef ref(kwargs);
+		auto& buf = kwargs->Get<wings::WDict>();
+		for (int i = 0; i < count; i++) {
+			Wg_Obj* key = Wg_NewString(kwargs->context, keys[i]);
+			if (key == nullptr)
+				return false;
+
+			wings::WDict::iterator it;
+			try {
+				it = buf.find(key);
+			} catch (wings::HashException&) {
+				return false;
+			}
+
+			if (it != buf.end()) {
+				out[i] = it->second;
+			} else {
+				out[i] = nullptr;
+			}
+		}
+		return true;
+	}
+
+	Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index) {
+		WG_ASSERT(obj && index);
+		return Wg_CallMethod(obj, "__getitem__", &index, 1);
+	}
+
+	Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value) {
+		WG_ASSERT(obj && index && value);
+		Wg_Obj* argv[2] = { index, value };
+		return Wg_CallMethod(obj, "__setitem__", argv, 2);
+	}
+
+	Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg) {
+		WG_ASSERT(arg);
+		Wg_Context* context = arg->context;
+		switch (op) {
+		case WG_UOP_POS:
+			return Wg_CallMethod(arg, "__pos__", nullptr, 0);
+		case WG_UOP_NEG:
+			return Wg_CallMethod(arg, "__neg__", nullptr, 0);
+		case WG_UOP_BITNOT:
+			return Wg_CallMethod(arg, "__invert__", nullptr, 0);
+		case WG_UOP_HASH:
+			return Wg_Call(context->builtins.hash, &arg, 1);
+		case WG_UOP_LEN:
+			return Wg_Call(context->builtins.len, &arg, 1);
+		case WG_UOP_BOOL:
+			if (Wg_IsBool(arg))
+				return arg;
+			return Wg_Call(context->builtins._bool, &arg, 1);
+		case WG_UOP_INT:
+			if (Wg_IsInt(arg))
+				return arg;
+			return Wg_Call(context->builtins._int, &arg, 1);
+		case WG_UOP_FLOAT:
+			if (Wg_IsIntOrFloat(arg))
+				return arg;
+			return Wg_Call(context->builtins._float, &arg, 1);
+		case WG_UOP_STR:
+			if (Wg_IsString(arg))
+				return arg;
+			return Wg_Call(context->builtins.str, &arg, 1);
+		case WG_UOP_REPR:
+			return Wg_Call(context->builtins.repr, &arg, 1);
+		case WG_UOP_INDEX: {
+			Wg_Obj* index = Wg_CallMethod(arg, "__index__", nullptr, 0);
+			if (index == nullptr) {
+				return nullptr;
+			} else if (!Wg_IsInt(index)) {
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "__index__() returned a non integer type");
+				return nullptr;
+			} else {
+				return index;
+			}
+		}
+		default:
+			WG_UNREACHABLE();
+		}
+	}
+
+	static const std::unordered_map<Wg_BinOp, const char*> OP_METHOD_NAMES = {
+		{ WG_BOP_ADD, "__add__" },
+		{ WG_BOP_SUB, "__sub__" },
+		{ WG_BOP_MUL, "__mul__" },
+		{ WG_BOP_DIV, "__truediv__" },
+		{ WG_BOP_FLOORDIV, "__floordiv__" },
+		{ WG_BOP_MOD, "__mod__" },
+		{ WG_BOP_POW, "__pow__" },
+		{ WG_BOP_BITAND, "__and__" },
+		{ WG_BOP_BITOR, "__or__" },
+		{ WG_BOP_BITXOR, "__not__" },
+		{ WG_BOP_SHL, "__lshift__" },
+		{ WG_BOP_SHR, "__rshift__" },
+		{ WG_BOP_IN, "__contains__" },
+		{ WG_BOP_EQ, "__eq__" },
+		{ WG_BOP_NE, "__ne__" },
+		{ WG_BOP_LT, "__lt__" },
+		{ WG_BOP_LE, "__le__" },
+		{ WG_BOP_GT, "__gt__" },
+		{ WG_BOP_GE, "__ge__" },
+	};
+
+	Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs) {
+		WG_ASSERT(lhs && rhs);
+
+		if (op == WG_BOP_IN)
+			std::swap(lhs, rhs);
+
+		auto method = OP_METHOD_NAMES.find(op);
+
+		switch (op) {
+		case WG_BOP_ADD:
+		case WG_BOP_SUB:
+		case WG_BOP_MUL:
+		case WG_BOP_DIV:
+		case WG_BOP_FLOORDIV:
+		case WG_BOP_MOD:
+		case WG_BOP_POW:
+		case WG_BOP_BITAND:
+		case WG_BOP_BITOR:
+		case WG_BOP_BITXOR:
+		case WG_BOP_SHL:
+		case WG_BOP_SHR:
+			return Wg_CallMethod(lhs, method->second, &rhs, 1);
+		case WG_BOP_EQ:
+		case WG_BOP_NE:
+		case WG_BOP_LT:
+		case WG_BOP_LE:
+		case WG_BOP_GT:
+		case WG_BOP_GE:
+		case WG_BOP_IN: {
+			Wg_Obj* boolResult = Wg_CallMethod(lhs, method->second, &rhs, 1);
+			if (!Wg_IsBool(boolResult)) {
+				std::string message = method->second;
+				message += "() returned a non bool type";
+				Wg_RaiseException(boolResult->context, WG_EXC_TYPEERROR, message.c_str());
+				return nullptr;
+			}
+			return boolResult;
+		}
+		case WG_BOP_NOTIN:
+			if (Wg_Obj* in = Wg_BinaryOp(WG_BOP_IN, lhs, rhs)) {
+				return Wg_UnaryOp(WG_UOP_NOT, in);
+			} else {
+				return nullptr;
+			}
+		case WG_BOP_AND: {
+			Wg_Obj* lhsb = Wg_UnaryOp(WG_UOP_BOOL, lhs);
+			if (lhsb == nullptr)
+				return nullptr;
+			if (!Wg_GetBool(lhsb))
+				return lhsb;
+			return Wg_UnaryOp(WG_UOP_BOOL, rhs);
+		}
+		case WG_BOP_OR: {
+			Wg_Obj* lhsb = Wg_UnaryOp(WG_UOP_BOOL, lhs);
+			if (lhsb == nullptr)
+				return nullptr;
+			if (Wg_GetBool(lhsb))
+				return lhsb;
+			return Wg_UnaryOp(WG_UOP_BOOL, rhs);
+		}
+		default:
+			WG_UNREACHABLE();
+		}
+	}
+
+	const char* Wg_GetErrorMessage(Wg_Context* context) {
+		WG_ASSERT(context);
+
+		if (context->currentException == nullptr) {
+			return (context->traceMessage = "Ok").c_str();
+		}
+
+		std::stringstream ss;
+		ss << "Traceback (most recent call last):\n";
+
+		for (const auto& frame : context->exceptionTrace) {
+			//if (frame.module == "__builtins__" ||
+			//	frame.module == "math" ||
+			//	frame.module == "random"
+			//	)
+			//{
+			//	continue;
+			//}
+
+			ss << "  ";
+			bool written = false;
+			
+			ss << "Module " << frame.module;
+			written = true;
+
+			if (frame.srcPos.line != (size_t)-1) {
+				if (written) ss << ", ";
+				ss << "Line " << (frame.srcPos.line + 1);
+				written = true;
+			}
+
+			if (frame.func != wings::DEFAULT_FUNC_NAME) {
+				if (written) ss << ", ";
+				ss << "Function " << frame.func << "()";
+			}
+
+			ss << "\n";
+
+			if (!frame.lineText.empty()) {
+				std::string lineText = frame.lineText;
+				std::replace(lineText.begin(), lineText.end(), '\t', ' ');
+
+				size_t skip = lineText.find_first_not_of(' ');
+				ss << "    " << (lineText.c_str() + skip) << "\n";
+				if (frame.syntaxError && skip <= frame.srcPos.column)
+				    ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
+			}
+		}
+
+		ss << context->currentException->type;
+		if (Wg_Obj* msg = Wg_GetAttributeNoExcept(context->currentException, "_message"))
+			if (Wg_IsString(msg) && *Wg_GetString(msg))
+				ss << ": " << Wg_GetString(msg);
+		ss << "\n";
+
+		context->traceMessage = ss.str();
+		return context->traceMessage.c_str();
+	}
+
+	Wg_Obj* Wg_GetException(Wg_Context* context) {
+		WG_ASSERT(context);
+		return context->currentException;
+	}
+
+	void Wg_ClearException(Wg_Context* context) {
+		WG_ASSERT_VOID(context);
+		context->currentException = nullptr;
+		context->traceMessage.clear();
+	}
+
+	void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message) {
+		WG_ASSERT_VOID(context);
+		switch (type) {
+		case WG_EXC_BASEEXCEPTION:
+			return Wg_RaiseExceptionClass(context->builtins.baseException, message);
+		case WG_EXC_SYSTEMEXIT:
+			return Wg_RaiseExceptionClass(context->builtins.systemExit, message);
+		case WG_EXC_EXCEPTION:
+			return Wg_RaiseExceptionClass(context->builtins.exception, message);
+		case WG_EXC_STOPITERATION:
+			return Wg_RaiseExceptionClass(context->builtins.stopIteration, message);
+		case WG_EXC_ARITHMETICERROR:
+			return Wg_RaiseExceptionClass(context->builtins.arithmeticError, message);
+		case WG_EXC_OVERFLOWERROR:
+			return Wg_RaiseExceptionClass(context->builtins.overflowError, message);
+		case WG_EXC_ZERODIVISIONERROR:
+			return Wg_RaiseExceptionClass(context->builtins.zeroDivisionError, message);
+		case WG_EXC_ATTRIBUTEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.attributeError, message);
+		case WG_EXC_IMPORTERROR:
+			return Wg_RaiseExceptionClass(context->builtins.importError, message);
+		case WG_EXC_LOOKUPERROR:
+			return Wg_RaiseExceptionClass(context->builtins.lookupError, message);
+		case WG_EXC_INDEXERROR:
+			return Wg_RaiseExceptionClass(context->builtins.indexError, message);
+		case WG_EXC_KEYERROR:
+			return Wg_RaiseExceptionClass(context->builtins.keyError, message);
+		case WG_EXC_MEMORYERROR:
+			return Wg_RaiseExceptionObject(context->builtins.memoryErrorInstance);
+		case WG_EXC_NAMEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.nameError, message);
+		case WG_EXC_OSERROR:
+			return Wg_RaiseExceptionClass(context->builtins.osError, message);
+		case WG_EXC_ISADIRECTORYERROR:
+			return Wg_RaiseExceptionClass(context->builtins.isADirectoryError, message);
+		case WG_EXC_RUNTIMEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.runtimeError, message);
+		case WG_EXC_NOTIMPLEMENTEDERROR:
+			return Wg_RaiseExceptionClass(context->builtins.notImplementedError, message);
+		case WG_EXC_RECURSIONERROR:
+			return Wg_RaiseExceptionObject(context->builtins.recursionErrorInstance);
+		case WG_EXC_SYNTAXERROR:
+			return Wg_RaiseExceptionClass(context->builtins.syntaxError, message);
+		case WG_EXC_TYPEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.typeError, message);
+		case WG_EXC_VALUEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.valueError, message);
+		default:
+			WG_ASSERT_VOID(false);
+		}
+	}
+
+	void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message) {
+		WG_ASSERT_VOID(klass);
+		wings::Wg_ObjRef ref(klass);
+
+		Wg_Obj* msg = Wg_NewString(klass->context, message);
+		if (msg == nullptr) {
+			return;
+		}
+
+		// If exception creation was successful then set the exception.
+		// Otherwise the exception will already be set by some other code.
+		if (Wg_Obj* exceptionObject = Wg_Call(klass, &msg, msg ? 1 : 0)) {
+			Wg_RaiseExceptionObject(exceptionObject);
+		}
+	}
+
+	void Wg_ReraiseExceptionObject(Wg_Obj* obj) {
+		WG_ASSERT_VOID(obj);
+		Wg_Context* context = obj->context;
+		if (Wg_IsInstance(obj, &context->builtins.baseException, 1)) {
+			context->currentException = obj;
+		} else {
+			Wg_RaiseException(context, WG_EXC_TYPEERROR, "exceptions must derive from BaseException");
+		}
+	}
+
+	void Wg_RaiseExceptionObject(Wg_Obj* obj) {
+		WG_ASSERT_VOID(obj);
+		Wg_Context* context = obj->context;
+		if (Wg_IsInstance(obj, &context->builtins.baseException, 1)) {
+			context->currentException = obj;
+			context->exceptionTrace.clear();
+			for (const auto& frame : context->currentTrace)
+				context->exceptionTrace.push_back(frame.ToOwned());
+		} else {
+			Wg_RaiseException(context, WG_EXC_TYPEERROR, "exceptions must derive from BaseException");
+		}
+	}
+
+	void Wg_RaiseArgumentCountError(Wg_Context* context, int given, int expected) {
+		WG_ASSERT_VOID(context && given >= 0 && expected >= -1);
+		std::string msg;
+		if (expected != -1) {
+			msg = "Function takes " +
+				std::to_string(expected) +
+				" argument(s) but " +
+				std::to_string(given) +
+				(given == 1 ? " was given" : " were given");
+		} else {
+			msg = "function does not take " +
+				std::to_string(given) +
+				" argument(s)";
+		}
+		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
+	}
+
+	void Wg_RaiseArgumentTypeError(Wg_Context* context, int index, const char* expected) {
+		WG_ASSERT_VOID(context && index >= 0 && expected);
+		std::string msg = "Argument " + std::to_string(index + 1)
+			+ " Expected type " + expected;
+		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
+	}
+
+	void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute) {
+		WG_ASSERT_VOID(obj && attribute);
+		std::string msg = "'" + wings::WObjTypeToString(obj) +
+			"' object has no attribute '" + attribute + "'";
+		Wg_RaiseException(obj->context, WG_EXC_ATTRIBUTEERROR, msg.c_str());
+	}
+
+	void Wg_RaiseZeroDivisionError(Wg_Context* context) {
+		WG_ASSERT_VOID(context);
+		Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR, "division by zero");
+	}
+
+	void Wg_RaiseIndexError(Wg_Context* context) {
+		WG_ASSERT_VOID(context);
+		Wg_RaiseException(context, WG_EXC_INDEXERROR, "index out of range");
+	}
+
+	void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key) {
+		WG_ASSERT_VOID(context);
+
+		if (key == nullptr) {
+			Wg_RaiseException(context, WG_EXC_KEYERROR);
+		} else {
+			std::string s = "<exception str() failed>";
+			if (Wg_Obj* repr = Wg_UnaryOp(WG_UOP_REPR, key))
+				s = Wg_GetString(repr);
+			Wg_RaiseException(context, WG_EXC_KEYERROR, s.c_str());
+		}
+	}
+
+	void Wg_RaiseNameError(Wg_Context* context, const char* name) {
+		WG_ASSERT_VOID(context && name);
+		std::string msg = "The name '";
+		msg += name;
+		msg += "' is not defined";
+		Wg_RaiseException(context, WG_EXC_NAMEERROR, msg.c_str());
+	}
+
+	void Wg_CollectGarbage(Wg_Context* context) {
+		WG_ASSERT_VOID(context);
+
+		std::deque<const Wg_Obj*> inUse;
+		if (!context->closing) {
+			if (context->currentException)
+				inUse.push_back(context->currentException);
+			for (const auto& obj : context->mem)
+				if (obj->refCount)
+					inUse.push_back(obj.get());
+			for (auto& [_, globals] : context->globals)
+				for (auto& var : globals)
+					inUse.push_back(*var.second);
+			for (Wg_Obj* obj : context->kwargs)
+				if (obj)
+					inUse.push_back(obj);
+			for (auto& obj : context->builtins.GetAll())
+				if (obj)
+					inUse.push_back(obj);
+			for (const auto& executor : context->executors)
+				executor->GetReferences(inUse);
+		}
+
+		// Recursively find objects in use
+		std::unordered_set<const Wg_Obj*> traversed;
+		while (inUse.size()) {
+			auto obj = inUse.back();
+			inUse.pop_back();
+			if (!traversed.contains(obj)) {
+				traversed.insert(obj);
+
+				if (Wg_IsTuple(obj) || Wg_IsList(obj)) {
+					inUse.insert(
+						inUse.end(),
+						obj->Get<std::vector<Wg_Obj*>>().begin(),
+						obj->Get<std::vector<Wg_Obj*>>().end()
+					);
+				} else if (Wg_IsDictionary(obj)) {
+					for (const auto& [key, value] : obj->Get<wings::WDict>()) {
+						inUse.push_back(key);
+						inUse.push_back(value);
+					}
+				} else if (Wg_IsSet(obj)) {
+					for (Wg_Obj* value : obj->Get<wings::WSet>()) {
+						inUse.push_back(value);
+					}
+				} else if (Wg_IsFunction(obj)) {
+					const auto& fn = obj->Get<Wg_Obj::Func>();
+					if (fn.self) {
+						inUse.push_back(fn.self);
+					}
+					if (fn.fptr == &wings::DefObject::Run) {
+						auto* def = (wings::DefObject*)fn.userdata;
+						for (const auto& capture : def->captures)
+							inUse.push_back(*capture.second);
+						for (const auto& arg : def->defaultParameterValues)
+							inUse.push_back(arg);
+					}
+				} else if (Wg_IsClass(obj)) {
+					inUse.insert(
+						inUse.end(),
+						obj->Get<Wg_Obj::Class>().bases.begin(),
+						obj->Get<Wg_Obj::Class>().bases.end()
+					);
+					obj->Get<Wg_Obj::Class>().instanceAttributes.ForEach([&](auto& entry) {
+						inUse.push_back(entry);
+						});
+				}
+
+				obj->attributes.ForEach([&](auto& entry) {
+					inUse.push_back(entry);
+					});
+			}
+		}
+
+		// Call finalizers
+		for (auto& obj : context->mem)
+			if (!traversed.contains(obj.get()))
+				for (const auto& finalizer : obj->finalizers)
+					finalizer.first(finalizer.second);
+
+		// Remove unused objects
+		context->mem.erase(
+			std::remove_if(
+				context->mem.begin(),
+				context->mem.end(),
+				[&traversed](const auto& obj) { return !traversed.contains(obj.get()); }
+			),
+			context->mem.end()
+		);
+
+		context->lastObjectCountAfterGC = context->mem.size();
+	}
+
+	void Wg_IncRef(Wg_Obj* obj) {
+		WG_ASSERT_VOID(obj);
+		obj->refCount++;
+	}
+
+	void Wg_DecRef(Wg_Obj* obj) {
+		WG_ASSERT_VOID(obj && obj->refCount > 0);
+		obj->refCount--;
+	}
+
+	Wg_Context* Wg_GetContextFromObject(Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->context;
+	}
+
+} // extern "C"
 
 
 #endif // #ifdef WINGS_IMPL
