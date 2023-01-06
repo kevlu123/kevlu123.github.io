@@ -24,9 +24,9 @@ function lcRgb(n) {
 }
 
 class LCSocket {
-    constructor(colCount, rowCount, socketAddress) {
-        this.rowCount = rowCount;
-        this.colCount = colCount;
+    constructor(socketAddress) {
+        this.rowCount = null;
+        this.colCount = null;
         this.socketAddress = socketAddress;
         this.socket = new WebSocket(socketAddress);
         this.socket.onopen = this._onOpen.bind(this);
@@ -79,6 +79,14 @@ class LCSocket {
         return this.recvByteRate;
     }
 
+    getRowCount() {
+        return this.rowCount;
+    }
+
+    getColCount() {
+        return this.colCount;
+    }
+
     send(p, c) {
         this.sendBuffer.push({ p: p, c: c });
     }
@@ -101,6 +109,16 @@ class LCSocket {
             lcLog("Invalid message from server: root JSON element is not an array.");
             return;
         }
+
+        // Initialize dimensions
+        if (changes.length === 2 && (lcIsInt(changes[0]) && lcIsInt(changes[1]))) {
+            this.colCount = changes[0];
+            this.rowCount = changes[1];
+            return;
+        } else if (this.rowCount === null) {
+            lcLog("Invalid message from server: dimensions not set.");
+            return;
+        } 
 
         for (let change of changes) {
             if (typeof change !== "object" || change === null) {
@@ -129,7 +147,7 @@ class LCSocket {
         }
 
         // Received full frame
-        if (changes.length == this.colCount * this.rowCount) {
+        if (changes.length === this.colCount * this.rowCount) {
             this.onFirstFrame?.();
         }
 
@@ -144,14 +162,14 @@ class LCSocket {
 }
 
 class LCInstance {
-    static run(colCount, rowCount, lcElem, socketAddress) {
-        return new LCInstance(colCount, rowCount, lcElem, socketAddress);
+    static run(lcElem, socketAddress) {
+        return new LCInstance(lcElem, socketAddress);
     }
 
-    constructor(colCount, rowCount, lcElem, socketAddress) {
+    constructor(lcElem, socketAddress) {
         let canvas = lcElem.getElementsByTagName("canvas")[0];
-        this.colCount = colCount;
-        this.rowCount = rowCount;
+        this.colCount = 512;
+        this.rowCount = 512;
         this.screenBuffer = [];
         this.cursorX = 0;
         this.cursorY = 0;
@@ -409,7 +427,7 @@ class LCInstance {
         this.lcsocket?.dispose();
         this.lcsocket = null;
         try {
-            this.lcsocket = new LCSocket(this.colCount, this.rowCount, this.socketAddress);
+            this.lcsocket = new LCSocket(this.socketAddress);
             this.lcsocket.onOpen = this.onSocketOpen.bind(this);
             this.lcsocket.onClose = this.onSocketClose.bind(this);
             this.lcsocket.onError = this.onSocketError.bind(this);
@@ -445,6 +463,8 @@ class LCInstance {
     onSocketFirstFrame() {
         this.enabled = true;
         this.clearScreenBuffer();
+        this.rowCount = this.lcsocket.getRowCount();
+        this.colCount = this.lcsocket.getColCount();
     }
 
     onSocketPixelReceived(x, y, colour) {

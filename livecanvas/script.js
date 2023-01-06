@@ -12,5 +12,5 @@ window.onload = () => {
     };
 
     let lcelem = document.getElementsByClassName("lc")[0];
-    lcinst = LCInstance.run(512, 512, lcelem, addr.value);
+    lcinst = LCInstance.run(lcelem, addr.value);
 };
