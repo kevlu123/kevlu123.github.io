@@ -1,18 +1,5 @@
-/**
- * JSON message format
- * 
- * [
- *   { "c": c, "p": y*w+x },
- *   ...
- * ]
-*/
-
 function lcLog(text) {
     //console.log(text);
-    //let elem = document.getElementById("log");
-    //if (elem.textContent.length > 1000)
-    //    elem.textContent = "";
-    //elem.textContent += text + "\n";
 }
 
 function lcIsInt(n) {
@@ -37,8 +24,8 @@ class LCSocket {
         this.onOpen = null;
         this.onClose = null;
         this.onError = null;
-        this.onFirstFrame = null;
-        this.onPixelReceived = null;
+        this.onInitMessage = null;
+        this.onDrawMessage = null;
         
         this.sendBuffer = [];
         this.sendByteRate = 0;
@@ -87,76 +74,38 @@ class LCSocket {
         return this.colCount;
     }
 
-    send(p, c) {
-        this.sendBuffer.push({ p: p, c: c });
-    }
-
-    flush() {
-        if (this.sendBuffer.length > 0) {
-            let data = JSON.stringify(this.sendBuffer);
-            this.sendBuffer = [];
-            this.socket.send(data);
-            this.sendByteCount += data.length;
-        }
+    send(x1, y1, x2, y2, thickness, colour) {
+        let msg = {
+            "type": "draw",
+            "x1": x1,
+            "y1": y1,
+            "x2": x2,
+            "y2": y2,
+            "thickness": thickness,
+            "colour": Number("0x" + colour.substring(1))
+        };
+        let data = JSON.stringify(msg);
+        this.socket.send(data);
+        this.sendByteCount += data.length;
     }
 
     _onMessage(e) {
         lcLog(`Socket recv.`);
         this.recvByteCount += e.data.length;
 
-        let changes = JSON.parse(e.data);
-        if (changes.constructor !== Array) {
-            lcLog("Invalid message from server: root JSON element is not an array.");
-            return;
-        }
-
-        // Initialize dimensions
-        if (changes.length === 2 && (lcIsInt(changes[0]) && lcIsInt(changes[1]))) {
-            this.colCount = changes[0];
-            this.rowCount = changes[1];
-            return;
-        } else if (this.rowCount === null) {
-            lcLog("Invalid message from server: dimensions not set.");
-            return;
-        } 
-
-        for (let change of changes) {
-            if (typeof change !== "object" || change === null) {
-                lcLog("Invalid message from server: array element is not an object.");
-                return;
+        let msg = null;
+        try {
+            msg = JSON.parse(e.data);
+            if (msg.type == "init") {
+                this.colCount = msg.width;
+                this.rowCount = msg.height;
+                this.onInitMessage?.(msg);
+            } else if (msg.type == "draw") {
+                this.onDrawMessage?.(msg);
             }
-            
-            if (!change.hasOwnProperty("c")) {
-                lcLog("Invalid message from server: object missing attribute 'c'.");
-                return;
-            } else if (!lcIsInt(change.c)) {
-                lcLog("Invalid message from server: attribute 'c' is not an integer.");
-                return;
-            } else if (change.c < 0 || change.c > 0xFFFFFFFF) {
-                lcLog("Invalid message from server: attribute 'c' is out of range.");
-                return;
-            }
-
-            if (!change.hasOwnProperty("p")) {
-                lcLog("Invalid message from server: object missing attribute 'p'.");
-                return;
-            } else if (!lcIsInt(change.p)) {
-                lcLog("Invalid message from server: attribute 'p' is not an integer.");
-                return;
-            }
-        }
-
-        // Received full frame
-        if (changes.length === this.colCount * this.rowCount) {
-            this.onFirstFrame?.();
-        }
-
-        for (let change of changes) {
-            let colour = lcRgb(change.c);
-            let pos = change.p;
-            let x = pos % this.colCount;
-            let y = Math.floor(pos / this.colCount);
-            this.onPixelReceived?.(x, y, colour);
+        } catch (e) {
+            lcLog(`Socket message error: ${e}`);
+            return;
         }
     }
 }
@@ -297,18 +246,30 @@ class LCInstance {
         if (cellPos && this.mouseButtonState) {
             if (this.lastCursorCellPos !== null) {
                 // Continue line
-                this.drawLine(...cellPos, ...this.lastCursorCellPos, this.brushRadius, this.brushColour);
+                this.lcsocket.send(
+                    cellPos[0],
+                    cellPos[1],
+                    this.lastCursorCellPos[0],
+                    this.lastCursorCellPos[1],
+                    this.brushRadius,
+                    this.brushColour
+                );
             } else {
                 // Begin draw
-                this.drawCircle(...cellPos, this.brushRadius, this.brushColour);
+                this.lcsocket.send(
+                    cellPos[0],
+                    cellPos[1],
+                    cellPos[0],
+                    cellPos[1],
+                    this.brushRadius,
+                    this.brushColour
+                );
             }
             this.lastCursorCellPos = cellPos;
         } else {
             // Mouse not down
             this.lastCursorCellPos = null;
         }
-
-        this.lcsocket.flush();
 
         lcLog(`send ${this.lcsocket.getSendByteRate()} recv ${this.lcsocket.getRecvByteRate()}`);
     }
@@ -355,17 +316,10 @@ class LCInstance {
         );
     }
 
-    drawPixel(x, y, c, broadcast=true) {
+    drawPixel(x, y, c) {
         if (this.isInBounds(x, y) && this.screenBuffer[y * this.colCount + x] !== c) {
             this.setPixel(x, y, c)
             this.screenBuffer[y * this.colCount + x] = c;
-
-            if (broadcast) {
-                this.lcsocket.send(
-                    y * this.colCount + x,
-                    parseInt(c.substring(1), 16)
-                );
-            }
         }
     }
 
@@ -431,8 +385,8 @@ class LCInstance {
             this.lcsocket.onOpen = this.onSocketOpen.bind(this);
             this.lcsocket.onClose = this.onSocketClose.bind(this);
             this.lcsocket.onError = this.onSocketError.bind(this);
-            this.lcsocket.onFirstFrame = this.onSocketFirstFrame.bind(this);
-            this.lcsocket.onPixelReceived = this.onSocketPixelReceived.bind(this);
+            this.lcsocket.onInitMessage = this.onSocketInitMessage.bind(this);
+            this.lcsocket.onDrawMessage = this.onSocketDrawMessage.bind(this);
         } catch (e) {
             this.onSocketError(e, this.socketAddress);
         }
@@ -460,14 +414,30 @@ class LCInstance {
         lcLog(`Socket error: ${e.message}`);
     }
 
-    onSocketFirstFrame() {
+    onSocketInitMessage(msg) {
         this.enabled = true;
         this.clearScreenBuffer();
         this.rowCount = this.lcsocket.getRowCount();
         this.colCount = this.lcsocket.getColCount();
+        for (let y = 0; y < this.rowCount; y++) {
+            for (let x = 0; x < this.colCount; x++) {
+                this.drawPixel(
+                    x,
+                    y,
+                    lcRgb(msg.pixels[y * this.colCount + x])
+                );
+            }
+        }
     }
 
-    onSocketPixelReceived(x, y, colour) {
-        this.drawPixel(x, y, colour, false);
+    onSocketDrawMessage(msg) {
+        this.drawLine(
+            msg.x1,
+            msg.y1,
+            msg.x2,
+            msg.y2,
+            msg.thickness,
+            lcRgb(msg.colour)
+        );
     }
 }
