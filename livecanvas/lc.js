@@ -154,7 +154,6 @@ class LCInstance {
             let touch = e.touches.item(0);
             this.cursorX = touch.clientX - this.canvas.offsetLeft;
             this.cursorY = touch.clientY - this.canvas.offsetTop;
-            e.preventDesult();
         }.bind(this));
 
         document.body.addEventListener("mousedown", function(e) {
@@ -162,12 +161,11 @@ class LCInstance {
                 this.mouseButtonState++;
             }
         }.bind(this));
-        document.body.addEventListener("touchstart", function() {
-            // Little hack to prevent the touchstart event
-            // from being fired before the touchmove
-            setTimeout(function(){
-                this.mouseButtonState++;
-            }.bind(this), 10);
+        document.body.addEventListener("touchstart", function(e) {
+            let touch = e.touches.item(0);
+            this.cursorX = touch.clientX - this.canvas.offsetLeft;
+            this.cursorY = touch.clientY - this.canvas.offsetTop;
+            this.mouseButtonState++;
         }.bind(this));
 
         document.body.addEventListener("mouseup", function(e) {
@@ -176,14 +174,10 @@ class LCInstance {
             }
         }.bind(this));
         document.body.addEventListener("touchend", function() {
-            setTimeout(function(){
-                this.mouseButtonState--;
-            }.bind(this), 10);
+            this.mouseButtonState--;
         }.bind(this));
         document.body.addEventListener("touchcancel", function() {
-            setTimeout(function(){
-                this.mouseButtonState--;
-            }.bind(this), 10);
+            this.mouseButtonState--;
         }.bind(this));
 
         this.canvas.onclick = function() {
