@@ -109,16 +109,6 @@ class Button {
         this._element.addEventListener("mouseleave", this.mouseLeaveListener);
     }
     
-    _setValueInternal(value) {
-        if (value) {
-            this._pressCount++;
-            this._presses++;
-        } else if (this._presses) {
-            this._presses--;
-        }
-        //this._render();
-    }
-    
     _mouseDownTouchStartAction() {
         this._mouseDown = true;
         this.press();
@@ -126,15 +116,16 @@ class Button {
 
     press() {
         this._wasPressed = true;
-        this._setValueInternal(1);
+        this._isPressed = true;
+        this._pressCount++;
     }
 
     release() {
-        this._setValueInternal(0);
+        this._isPressed = false;
     }
 
     isPressed() {
-        return this._presses;
+        return this._isPressed;
     }
 
     getPressCount() {
@@ -142,7 +133,7 @@ class Button {
     }
 
     render() {
-        const fill = !!this._presses ? "#00c800" : "#000000";
+        const fill = this._isPressed ? "#00c800" : "#000000";
         this._element.querySelectorAll("circle").forEach((c) => {
             c.style.fill = fill;
         });
