@@ -1,0 +1,89 @@
+* {
+    padding: 0px;
+    margin: 0px;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    background-color: bisque;
+}
+
+p, span, textarea, label {
+    font-family: monospace;
+}
+
+input[type="checkbox"] {
+    align-self: flex-start;
+    margin: 5px;
+}
+
+textarea {
+    padding: 10px;
+    margin: 5px 0px;
+    resize: none;
+    border-style: solid;
+    border-color: black;
+    border-width: 1px;
+    white-space: pre;
+    overflow-wrap: normal;
+}
+
+button {
+    padding: 10px;
+    margin: 5px 0px;
+    border-style: solid;
+    border-color: black;
+    border-width: 1px;
+    background-color: rgb(255, 238, 216);
+    cursor: pointer;
+}
+
+.container {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    max-width: 800px;
+    padding: 20px;
+    width: 100%;
+}
+
+.container > * {
+    margin: 5px 0px;
+}
+
+#no-coi {
+    background-color: rgb(255, 206, 206);
+    color: red;
+    font-weight: bold;
+    text-align: center;
+    border-color: red;
+    border-width: 1px;
+    border-style: solid;
+    padding: 10px;
+}
+
+#microbit {
+    max-height: 70vh;
+    margin-bottom: 20px;
+}
+
+.acc-controls {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    border-style: solid;
+    border-color: rgb(167, 134, 94);
+    border-width: 1px;
+    padding: 16px;
+}
+
+#out {
+    background-color: rgb(255, 238, 216);
+    border-color: rgb(167, 134, 94);
+    height: 100px;
+}
+
+#code {
+    min-height: 400px;
+}
