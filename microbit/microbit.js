@@ -1,6 +1,7 @@
 class Microbit {
     constructor(svg) {
         this._ledStates = new Array(25).fill(0);
+        this._lastLedStates = new Array(25).fill(0);
         this._ledsElements = svg.querySelector("#LEDsOn").querySelectorAll("use");
 
         this._micLedState = false;
@@ -44,11 +45,12 @@ class Microbit {
 
     render() {
         for (let i = 0; i < 25; i++) {
-            let value = this._ledStates[i];
+            let value = Math.max(this._lastLedStates[i], this._ledStates[i]); // Reduce flickering
             let led = this._ledsElements[i];
             led.style.display = "inline";
             led.style.opacity = (value / 9).toString();
         }
+        this._lastLedStates = this._ledStates.slice();
 
         this._buttons[0].render();
         this._buttons[1].render();
