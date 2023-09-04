@@ -45,7 +45,7 @@ class Accelerometer {
 
     calibrate() {
         this.invertX = this.rawX > 0;
-        this.invertY = this.rawY > 0;
+        this.invertY = this.rawY < 0;
         this.invertZ = this.rawZ > 0;
     }
 }

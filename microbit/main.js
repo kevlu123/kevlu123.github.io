@@ -18,7 +18,7 @@ class Program {
         this.sab = new Int32Array(this.sab_buffer);
         this.sendState();
 
-        this.intervalId = setInterval(this.loop.bind(this), 17);
+        this.intervalId = setInterval(this.loop.bind(this), 20);
 
         this.lastMicReadTime = 0;
     }
