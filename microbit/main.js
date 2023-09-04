@@ -104,15 +104,31 @@ function setAccelerometerLabel(axis, value) {
 }
 
 function calibrateAccelerometer() {
-    alert("Hold your device so that the bottom left points toward the ground"
-        + " while the screen is tilted slightly towards the sky, then press OK.");
+    alert("Hold your device so that the bottom of the screen points toward the ground, then press OK.");
     setTimeout(() => {
-        Accelerometer.instance.calibrate();
-        document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
-        document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
-        document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;
-        alert("Calibration complete.");
+        Accelerometer.instance.calibrateAxis("Y");
+        alert("Hold your device so that the side of the screen points toward the ground, then press OK.");
+        setTimeout(() => {
+            Accelerometer.instance.calibrateAxis("X");
+            alert("Lay your device flat with the screen facing towards the sky, then press OK.");
+            setTimeout(() => {
+                Accelerometer.instance.calibrateAxis("Z");
+                document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
+                document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
+                document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;
+                alert("Calibration complete.");
+            }, 500);
+        }, 500);
     }, 500);
+    //alert("Hold your device so that the bottom left points toward the ground"
+    //    + " while the screen is tilted slightly towards the sky, then press OK.");
+    //setTimeout(() => {
+    //    Accelerometer.instance.calibrate();
+    //    document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
+    //    document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
+    //    document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;
+    //    alert("Calibration complete.");
+    //}, 500);
 }
 
 function isMobile() {
