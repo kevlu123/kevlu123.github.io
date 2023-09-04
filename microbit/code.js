@@ -6,7 +6,7 @@ def accelerometer_to_position(acc):
 
 while True:
 	x = accelerometer_to_position(accelerometer.get_x())
-	y = accelerometer_to_position(accelerometer.get_y())
+	y = 4 - accelerometer_to_position(accelerometer.get_y())
 	display.clear()
 	display.set_pixel(x, y, 9)
 	sleep(100)
