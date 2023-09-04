@@ -104,15 +104,35 @@ function setAccelerometerLabel(axis, value) {
 }
 
 function calibrateAccelerometer() {
+    let originalConfig = {
+        axisMap: Object.assign({}, Accelerometer.instance.axisMap),
+        invertX: Accelerometer.instance.invertX,
+        invertY: Accelerometer.instance.invertY,
+        invertZ: Accelerometer.instance.invertZ,
+    };
+
     alert("Hold your device so that the bottom of the screen points toward the ground, then press OK.");
     setTimeout(() => {
         Accelerometer.instance.calibrateAxis("Y");
-        alert("Hold your device so that the side of the screen points toward the ground, then press OK.");
+        alert("Hold your device so that the left side of the screen points toward the ground, then press OK.");
         setTimeout(() => {
             Accelerometer.instance.calibrateAxis("X");
             alert("Lay your device flat with the screen facing towards the sky, then press OK.");
             setTimeout(() => {
                 Accelerometer.instance.calibrateAxis("Z");
+
+                if (Accelerometer.instance.axisMap["x"] === Accelerometer.instance.axisMap["y"]
+                    || Accelerometer.instance.axisMap["x"] === Accelerometer.instance.axisMap["z"]
+                    || Accelerometer.instance.axisMap["y"] === Accelerometer.instance.axisMap["z"])
+                {
+                    alert("Calibration failed. Please try again.");
+                    Accelerometer.instance.axisMap = originalConfig.axisMap;
+                    Accelerometer.instance.invertX = originalConfig.invertX;
+                    Accelerometer.instance.invertY = originalConfig.invertY;
+                    Accelerometer.instance.invertZ = originalConfig.invertZ;
+                    return;
+                }
+
                 document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
                 document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
                 document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;

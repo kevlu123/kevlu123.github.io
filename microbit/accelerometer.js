@@ -17,7 +17,7 @@ class Accelerometer {
 
         this.manual = false;
 
-        this._axisMap = {
+        this.axisMap = {
             "x": "x",
             "x": "y",
             "z": "z",
@@ -31,9 +31,9 @@ class Accelerometer {
         this.rawY = ms2ToMilliG(event.accelerationIncludingGravity.y);
         this.rawZ = ms2ToMilliG(event.accelerationIncludingGravity.z);
         if (!this.manual) {
-            this[this._axisMap["x"]] = this.rawX;
-            this[this._axisMap["y"]] = this.rawY;
-            this[this._axisMap["z"]] = this.rawZ;
+            this[this.axisMap["x"]] = this.rawX;
+            this[this.axisMap["y"]] = this.rawY;
+            this[this.axisMap["z"]] = this.rawZ;
             if (this.invertX) this.x *= -1;
             if (this.invertY) this.y *= -1;
             if (this.invertZ) this.z *= -1;
@@ -63,8 +63,8 @@ class Accelerometer {
             Math.abs(this.rawZ)
         );
         for (let ax of ["X", "Y", "Z"]) {
-            if (this["raw" + ax] === extreme) {
-                this._axisMap[axis.toLowerCase()] = ax.toLowerCase();
+            if (Math.abs(this["raw" + ax]) === extreme) {
+                this.axisMap[axis.toLowerCase()] = ax.toLowerCase();
                 this["invert" + ax] = this["raw" + ax] > 0;
                 return;
             }
