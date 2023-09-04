@@ -105,8 +105,7 @@ function setAccelerometerLabel(axis, value) {
 
 function calibrateAccelerometer() {
     alert("Hold your device so that the bottom left points toward the ground"
-        + "while the screen is tilted slightly towards the sky, then press OK."
-        + "(You want all accelerometer axes to read negative)");
+        + " while the screen is tilted slightly towards the sky, then press OK.");
     setTimeout(() => {
         Accelerometer.instance.calibrate();
         document.getElementById("invert-x").checked = Accelerometer.instance.invertX;

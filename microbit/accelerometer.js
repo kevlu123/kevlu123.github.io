@@ -21,9 +21,9 @@ class Accelerometer {
     }
     
     _onMotion(event) {
-        this.rawX = ms2ToMilliG(event.accelerationIncludingGravity.x);
+        this.rawX = ms2ToMilliG(-event.accelerationIncludingGravity.x);
         this.rawY = ms2ToMilliG(event.accelerationIncludingGravity.y);
-        this.rawZ = ms2ToMilliG(event.accelerationIncludingGravity.z);
+        this.rawZ = ms2ToMilliG(-event.accelerationIncludingGravity.z);
         if (!this.manual) {
             this.x = this.rawX;
             this.y = this.rawY;
