@@ -7,6 +7,8 @@
 
 #include <emscripten.h>
 
+#include "pitchfork5x5.h"
+
 #define EMBED_FUNC_NAME(func, name) {							\
 	Wg_Obj* func = Wg_NewFunction(ctx, ::func, nullptr, name);	\
 	if (func == nullptr) {										\
@@ -27,17 +29,37 @@ static void Call(const char* func, std::string_view args) {
 	emscripten_run_script(script.c_str());
 }
 
+static void SetPixel(int x, int y, int v) {
+	Call("setPixel",
+		  std::to_string(x) + ","
+		+ std::to_string(y) + ","
+		+ std::to_string(v)
+	);
+}
+
 static Wg_Obj* set_pixel(Wg_Context* context, Wg_Obj** argv, int argc) {
 	WG_EXPECT_ARG_COUNT(3);
 	for (int i = 0; i < 3; i++) {
 		WG_EXPECT_ARG_TYPE_INT(i);
 	}
 
-	Call("setPixel",
-		  std::to_string(Wg_GetInt(argv[0])) + ","
-		+ std::to_string(Wg_GetInt(argv[1])) + ","
-		+ std::to_string(Wg_GetInt(argv[2]))
-	);
+	Wg_int x = Wg_GetInt(argv[0]);
+	Wg_int y = Wg_GetInt(argv[1]);
+	Wg_int v = Wg_GetInt(argv[2]);
+	if (x < 0 || x > 4 || y < 0 || y > 4) {
+		std::string msg = "index out of bounds: ("
+			+ std::to_string(x) + ", "
+			+ std::to_string(y) + ")";
+		Wg_RaiseException(context, WG_EXC_VALUEERROR, msg.c_str());
+		return nullptr;
+	} else if (v < 0 || v > 9) {
+		std::string msg = "brightness out of bounds: "
+			+ std::to_string(v);
+		Wg_RaiseException(context, WG_EXC_VALUEERROR, msg.c_str());
+		return nullptr;
+	}
+
+	SetPixel((int)x, (int)y, (int)v);
 	return Wg_None(context);
 }
 
@@ -50,7 +72,39 @@ static Wg_Obj* clear(Wg_Context* context, Wg_Obj** argv, int argc) {
 static Wg_Obj* scroll(Wg_Context* context, Wg_Obj** argv, int argc) {
 	WG_EXPECT_ARG_COUNT(1);
 	WG_EXPECT_ARG_TYPE_STRING(0);
+
+	std::string text = Wg_GetString(argv[0]);
+	for (int scroll = -5; scroll < 6 * (int)text.size(); scroll++) {
+		Call("clearDisplay", "");
+		
+		for (int x = 0; x < 5; x++) {
+			if (scroll + x < 0) {
+				continue;
+			}
+
+			char c = text[(scroll + x) / 6];
+			if (c < 0x20 || c > 0x7E) {
+				c = ' ';
+			}
+			int column = (scroll + x) % 6;
+
+			// Gap between characters
+			if (column == 5) {
+				continue;
+			}
+
+			for (int y = 0; y < 5; y++) {
+				if (Font[5 * (c - 0x20) + column] & (1 << y)) {
+					SetPixel(x, y, 9);
+				}
+			}
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	}
 	Call("clearDisplay", "");
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
 	return Wg_None(context);
 }
 
@@ -88,7 +142,8 @@ static bool LoadAccelerometerModule(Wg_Context* ctx) {
 
 static Wg_Obj* sound_level(Wg_Context* context, Wg_Obj** argv, int argc) {
 	WG_EXPECT_ARG_COUNT(0);
-	return Wg_NewInt(context, 0);
+	int v = emscripten_run_script_int("read_sab('mic_vol');");
+	return Wg_NewInt(context, v);
 }
 
 static bool LoadMicrophoneModule(Wg_Context* ctx) {

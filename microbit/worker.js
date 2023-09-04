@@ -36,18 +36,24 @@ function read_sab(attr) {
             }
             let obj = JSON.parse(json);
 
-            if (attr === "a_was_pressed") {
-                if (a_press_count != obj.a_press_count) {
-                    a_press_count = obj.a_press_count;
-                    return 1;
-                }
-                return 0;
-            } else if (attr === "b_was_pressed") {
-                if (b_press_count != obj.b_press_count) {
-                    b_press_count = obj.b_press_count;
-                    return 1;
-                }
-                return 0;
+            switch (attr) {
+                case "a_was_pressed":
+                    if (a_press_count != obj.a_press_count) {
+                        a_press_count = obj.a_press_count;
+                        return 1;
+                    }
+                    return 0;
+                case "b_was_pressed":
+                    if (b_press_count != obj.b_press_count) {
+                        b_press_count = obj.b_press_count;
+                        return 1;
+                    }
+                    return 0;
+                case "mic_vol":
+                    postMessage({
+                        type: "mic_read",
+                    });
+                    break;
             }
 
             return obj[attr];
@@ -71,6 +77,10 @@ onmessage = (event) => {
             postMessage({
                 type: "error",
                 message: e.toString() + "\n"
+            });
+        } finally {
+            postMessage({
+                type: "done"
             });
         }
         break;

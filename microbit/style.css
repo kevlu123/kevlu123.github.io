@@ -1,89 +1,115 @@
 * {
-    padding: 0px;
-    margin: 0px;
+  padding: 0px;
+  margin: 0px;
 }
 
 body {
-    display: flex;
-    justify-content: center;
-    background-color: bisque;
+  display: flex;
+  justify-content: center;
+  background-color: bisque;
 }
 
 p, span, textarea, label {
-    font-family: monospace;
+  font-family: monospace;
 }
 
-input[type="checkbox"] {
-    align-self: flex-start;
-    margin: 5px;
+input[type=checkbox] {
+  align-self: flex-start;
+  margin: 5px;
 }
 
 textarea {
-    padding: 10px;
-    margin: 5px 0px;
-    resize: none;
-    border-style: solid;
-    border-color: black;
-    border-width: 1px;
-    white-space: pre;
-    overflow-wrap: normal;
+  padding: 10px;
+  margin: 5px 0px;
+  resize: none;
+  border-style: solid;
+  border-color: black;
+  border-width: 1px;
+  white-space: pre;
+  overflow-wrap: normal;
+  -moz-tab-size: 4;
+  -o-tab-size: 4;
+  tab-size: 4;
 }
 
 button {
-    padding: 10px;
-    margin: 5px 0px;
-    border-style: solid;
-    border-color: black;
-    border-width: 1px;
-    background-color: rgb(255, 238, 216);
-    cursor: pointer;
+  padding: 10px;
+  margin: 5px 0px;
+  border-style: solid;
+  border-color: black;
+  border-width: 1px;
+  background-color: rgb(255, 238, 216);
+  cursor: pointer;
+}
+
+h2 {
+  font-family: monospace;
+  font-size: x-large;
 }
 
 .container {
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-    max-width: 800px;
-    padding: 20px;
-    width: 100%;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  max-width: 800px;
+  padding: 20px;
+  width: 100%;
 }
 
 .container > * {
-    margin: 5px 0px;
+  margin: 5px 0px;
 }
 
-#no-coi {
-    background-color: rgb(255, 206, 206);
-    color: red;
-    font-weight: bold;
-    text-align: center;
-    border-color: red;
-    border-width: 1px;
-    border-style: solid;
-    padding: 10px;
+.preset {
+  padding: 4px;
+  margin: 0px;
 }
 
-#microbit {
-    max-height: 70vh;
-    margin-bottom: 20px;
+#diff {
+  border-color: rgb(167, 134, 94);
+  border-width: 1px;
+  border-style: solid;
+  padding: 10px;
 }
 
 .acc-controls {
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-    border-style: solid;
-    border-color: rgb(167, 134, 94);
-    border-width: 1px;
-    padding: 16px;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  border-style: solid;
+  border-color: rgb(167, 134, 94);
+  border-width: 1px;
+  padding: 16px;
+}
+
+.inl-btn {
+  padding: 4px;
+  margin: 0px;
+  border-color: grey;
+}
+
+#no-coi {
+  background-color: rgb(255, 206, 206);
+  color: red;
+  font-weight: bold;
+  text-align: center;
+  border-color: red;
+  border-width: 1px;
+  border-style: solid;
+  padding: 10px;
+}
+
+#microbit {
+  max-height: 70vh;
+  margin-bottom: 20px;
 }
 
 #out {
-    background-color: rgb(255, 238, 216);
-    border-color: rgb(167, 134, 94);
-    height: 100px;
+  background-color: rgb(255, 238, 216);
+  border-color: rgb(167, 134, 94);
+  height: 100px;
 }
 
 #code {
-    min-height: 400px;
+  min-height: 400px;
 }

@@ -9,12 +9,28 @@
   <link rel='stylesheet' type='text/css' media='screen' href='style.css'>
   <script src="coi-serviceworker.js"></script>
   <script src='code.js'></script>
+  <script src='mic.js'></script>
+  <script src='accelerometer.js'></script>
   <script src='microbit.js'></script>
   <script src='main.js'></script>
 </head>
 
 <body>
   <div class="container">
+    <!-- Header-->
+    <!--nav>
+      <a class="hover-link" href="/index.html">
+        <img class="valign" src="/global/logo.png" height="40">
+        ~
+      </a>
+      /
+      <a class="hover-link" href="#top">wings</a>
+
+      <a class="github-link" href="https://github.com/kevlu123">
+        GitHub
+      </a>
+    </nav-->
+
 
     <svg id="microbit" enable-background="new" version="1.1" viewBox="0 0 191.27 155.77" xmlns="http://www.w3.org/2000/svg"
       xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"
@@ -677,13 +693,14 @@
       </g>
     </svg>
 
-    <div id="no-coi" hidden>Cross-origin isolation is not enabled! Try another browser.</div>
+    <div id="no-coi" hidden>Cross-origin isolation is required! Try another browser.</div>
     <button id="startstop" onclick="startstop()">Run</button>
 
     <div class="acc-controls">
       <div>
-        <input id="manual-acc" type="checkbox" checked>
-        <span>Manual accelerometer override</span>
+        <input id="auto-acc" type="checkbox" checked>
+        <span>Use device accelerometer | </span>
+        <button class="inl-btn" id="calibrate" onclick="calibrateAccelerometer()">Calibrate</button>
       </div>
 
       <div>
@@ -691,27 +708,274 @@
         <input id="invert-x" type="checkbox">
         <span>Invert Axis</span>
       </div>
-      <input id="acc-x" oninput="setAccelerometer('x', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
+      <input id="acc-x" oninput="setAccelerometerLabel('x', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
       
       <div>
         <span id="acc-label-y">Accelerometer Y (0)</span>
         <input id="invert-y" type="checkbox">
         <span>Invert Axis</span>
       </div>
-      <input id="acc-y" oninput="setAccelerometer('y', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
+      <input id="acc-y" oninput="setAccelerometerLabel('y', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
       
       <div>
         <span id="acc-label-z">Accelerometer Z (0)</span>
         <input id="invert-z" type="checkbox">
         <span>Invert Axis</span>
       </div>
-      <input id="acc-z" oninput="setAccelerometer('z', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
+      <input id="acc-z" oninput="setAccelerometerLabel('z', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
     </div>
 
-    <p>Output</p>
+    <span>
+      <span>Output</span>
+      <button class="inl-btn" onclick="document.getElementById('out').value = ''">Clear</button>
+    </span>
     <textarea id="out" spellcheck="false" readonly></textarea>
-    <p>Code</p>
+
+    <span>
+      <span>Code | Presets: </span>
+      <button class="inl-btn" class="preset" onclick="setPreset(battleshipsCode)">Battleships</button>
+      <button class="inl-btn" class="preset" onclick="setPreset(patternCode)">Pattern</button>
+      <button class="inl-btn" class="preset" onclick="setPreset(micCode)">Microphone</button>
+      <button class="inl-btn" class="preset" onclick="setPreset(accCode)">Accelerometer</button>
+    </span>
     <textarea id="code" spellcheck="false"></textarea>
+
+    <h2>Changes to the original Battleships code from the hackathon</h2>
+    <p>
+      This is a near identical copy of the code that was written during the hackathon
+      before any network code was added.
+      In order to get the code to run with the <a href="https://kevlu123.github.io/wings">Python engine</a>
+      the following changes were made to the original code:
+    </p>
+    <p>
+      - Changed a list comprehension to use only one iteration variable.
+      <br>- Added brackets around tuples where they were omitted.
+      <br>- Changed all indentation to be uniform.
+      <br>- Removed triple quoted strings which were used as comments.
+    </p>
+    <p>
+      All of these incompatibilities are planned to be fixed in the future.
+    </p>
+    <button id="show-diff" onclick="showDiff()">Show Diff</button>
+    <div id="diff" hidden>
+
+      <p><em>diff --git a/old.py b/new.py</em></p>
+
+      <p><em>index 5e1fa8d..ae4d7b9 100644</em></p>
+
+      <p><em>--- a/old.py</em></p>
+
+      <p><em>+++ b/new.py</em></p>
+
+      <p><em>@@ -25,7 +25,7 @@</em><span style="color:#657b83"> class Ship:</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;self.y = top_y</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;self.ship_len = ship_len</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;self.rotation = rotation</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp;self.tiles = [ShipTile(x, y) for x, y in self.get_ship_tiles()]</span></p>
+
+      <p><span style="color:#859900">+ &nbsp; &nbsp; &nbsp; &nbsp;self.tiles = [ShipTile(*pos) for pos in self.get_ship_tiles()]</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;def serialize(self):</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return &quot;{},{},{},{}&quot;.format(</span></p>
+
+      <p><em>@@ -46,10 +46,6 @@</em><span style="color:#657b83"> class Ship:</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return [(self.x, self.y + i) for i in range(self.ship_len)]</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;def get_overlapping_ship_tiles(self, other_ships):</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp;&quot;&quot;&quot;</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp;Returns a list of (x, y) tuples of the tiles that overlap with any of other_ships.</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp;other_ships is a list of Ship objects.</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp;&quot;&quot;&quot;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;overlapping_tiles = []</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;for ship in other_ships:</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;for tile in ship.tiles:</span></p>
+
+      <p><em>@@ -113,7 +109,7 @@</em><span style="color:#657b83"> def explosion(x, y, size=2):</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;y -= 1</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;for i in range(3):</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp; for j in range(3):</span></p>
+
+      <p><span style="color:#859900">+ &nbsp; &nbsp; &nbsp; &nbsp;for j in range(3):</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;show_led(x+i,y+j)</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;clear_led(x+1, y+1)</span></p>
+
+      <p><em>@@ -130,7 +126,7 @@</em><span style="color:#657b83"> def game_over():</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;y -= 1</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;for i in range(3):</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp; for j in range(3):</span></p>
+
+      <p><span style="color:#859900">+ &nbsp; &nbsp; &nbsp; &nbsp;for j in range(3):</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;show_led(x+i,y+j)</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;sleep(500)</span></p>
+
+      <p><em>@@ -158,10 +154,6 @@</em><span style="color:#657b83"> def miss_shot(x, y, missed_shots):</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;missed_shots.append(miss_position)</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp;def get_ship_placement_bounds(ship_len, rotation):</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp;&quot;&quot;&quot;</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp;Get a tuple (x_min, x_max, y_min, y_max) of the</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp;inclusive range of the valid ship placements.</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp;&quot;&quot;&quot;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;if rotation == HORIZONTAL_ROTATION:</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return (0, 5 - ship_len, 0, 4)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;else:</span></p>
+
+      <p><em>@@ -172,7 +164,6 @@</em><span style="color:#657b83"> def clamp(v, lower, upper):</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp;def get_position_from_accelerometer():</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;def accelerometer_to_position(acc):</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp;#&quot;&quot;&quot; Convert accelerometer value to position in [0, 4]&quot;&quot;&quot;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;v = int((acc + 1000) / 2000 * 5)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return clamp(v, 0, 4)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span></p>
+
+      <p><em>@@ -196,10 +187,6 @@</em><span style="color:#657b83"> def display_placement_error(existing_ships, new_ship, overlapping_tiles):</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;sleep(200)</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp;def run_placement():</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp;&quot;&quot;&quot;</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp;Returns a list of my ships.</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp;Each ship is a list of positions represented as (x, y) tuples.</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp;&quot;&quot;&quot;</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;# Clear key press buffer</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;button_a.was_pressed()</span></p>
+
+      <p><em>@@ -211,10 +198,10 @@</em><span style="color:#657b83"> def run_placement():</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp;for ship_len in SHIP_LENS:</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;x = 0</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;y = 0</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp;x_min, x_max, y_min, y_max = get_ship_placement_bounds(ship_len, rot)</span></p>
+
+      <p><span style="color:#859900">+ &nbsp; &nbsp; &nbsp; &nbsp;(x_min, x_max, y_min, y_max) = get_ship_placement_bounds(ship_len, rot)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;while True:</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;x, y = get_position_from_accelerometer()</span></p>
+
+      <p><span style="color:#859900">+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;(x, y) = get_position_from_accelerometer()</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;x = clamp(x, x_min, x_max)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;y = clamp(y, y_min, y_max)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span></p>
+
+      <p><em>@@ -223,7 +210,7 @@</em><span style="color:#657b83"> def run_placement():</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;if button_a.was_pressed():</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;# Toggle rotation</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;rot = 1 - rot</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;x_min, x_max, y_min, y_max = get_ship_placement_bounds(ship_len, rot)</span></p>
+
+      <p><span style="color:#859900">+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;(x_min, x_max, y_min, y_max) = get_ship_placement_bounds(ship_len, rot)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;x = clamp(x, x_min, x_max)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;y = clamp(y, y_min, y_max)</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;elif button_b.was_pressed():</span></p>
+
+      <p><em>@@ -276,7 +263,7 @@</em><span style="color:#657b83"> def run_game(ship_list):</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;# Show the position</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;lock_position = button_b.is_pressed()</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;if not lock_position:</span></p>
+
+      <p><span style="color:#dc322f">- &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;x, y = get_position_from_accelerometer()</span></p>
+
+      <p><span style="color:#859900">+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;(x, y) = get_position_from_accelerometer()</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;show_led(x,y)</span></p>
+
+      <p><span style="color:#657b83">&nbsp;</span></p>
+
+      <p><span style="color:#657b83">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;# To fire a shot you have to shot</span></p>
+
+      <p>&nbsp;</p>
+
+    </div>
+
+    <h2>Credits</h2>
+    <p>
+      Font used by display.scroll()
+      <a href="https://github.com/stef/pitchfork-5x5">https://github.com/stef/pitchfork-5x5</a>
+      (licensed under GPLv3)
+    </p>
+
   </div>
 </body>
 

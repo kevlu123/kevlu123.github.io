@@ -7,12 +7,10 @@ class Microbit {
         this._micLedState = false;
         this._micElement = svg.querySelector("#LitMicrophone");
 
-        this._buttons = [
+        this.buttons = [
             new Button(svg.querySelector("#ButtonA")),
             new Button(svg.querySelector("#ButtonB"))
         ];
-
-        this._accelerometer = new Accelerometer();
     }
 
     clearDisplay() {
@@ -33,13 +31,14 @@ class Microbit {
 
     getState() {
         return {
-            acc_x: this._accelerometer.x,
-            acc_y: this._accelerometer.y,
-            acc_z: this._accelerometer.z,
-            a_pressed: this._buttons[0].isPressed(),
-            b_pressed: this._buttons[1].isPressed(),
-            a_press_count: this._buttons[0].getPressCount(),
-            b_press_count: this._buttons[1].getPressCount(),
+            acc_x: Accelerometer.instance.x,
+            acc_y: Accelerometer.instance.y,
+            acc_z: Accelerometer.instance.z,
+            a_pressed: this.buttons[0].isPressed(),
+            b_pressed: this.buttons[1].isPressed(),
+            a_press_count: this.buttons[0].getPressCount(),
+            b_press_count: this.buttons[1].getPressCount(),
+            mic_vol: Microphone.instance.volume,
         };
     }
 
@@ -52,10 +51,28 @@ class Microbit {
         }
         this._lastLedStates = this._ledStates.slice();
 
-        this._buttons[0].render();
-        this._buttons[1].render();
+        this.buttons[0].render();
+        this.buttons[1].render();
         
         this._micElement.style.display = this._micLedState ? "unset" : "none";
+    }
+
+    showErrorImage() {
+        this.clearDisplay();
+        this._ledStates = [
+            0, 0, 0, 0, 9,
+            9, 9, 0, 9, 0,
+            0, 0, 0, 9, 0,
+            9, 9, 0, 9, 0,
+            0, 0, 0, 0, 9,
+        ];
+        this._lastLedStates = [
+            0, 0, 0, 0, 9,
+            9, 9, 0, 9, 0,
+            0, 0, 0, 9, 0,
+            9, 9, 0, 9, 0,
+            0, 0, 0, 0, 9,
+        ];
     }
 }
 
@@ -140,28 +157,4 @@ class Button {
             c.style.fill = fill;
         });
     }
-}
-
-class Accelerometer {
-    constructor() {
-        // Request permission for iOS 13+ devices
-        if (DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function") {
-            DeviceMotionEvent.requestPermission();
-        }
-        
-        this.x = 0;
-        this.y = 0;
-        this.z = 0;
-        ondevicemotion = this._onMotion.bind(this);
-    }
-    
-    _onMotion(event) {
-        this.x = ms2ToMilliG(event.accelerationIncludingGravity.x);
-        this.y = ms2ToMilliG(event.accelerationIncludingGravity.y);
-        this.z = ms2ToMilliG(event.accelerationIncludingGravity.z);
-    }
-}
-
-function ms2ToMilliG(ms2) {
-    return ms2 / 9.81 * 1000;
 }

@@ -2,15 +2,15 @@ class Program {
     constructor() {
         let svg = document.getElementById("microbit");
         this.microbit = new Microbit(svg);
+
         this.codeElement = document.getElementById("code");
-        this.outputElement = document.getElementById("out");
-        this.manualAccElement = document.getElementById("manual-acc");
+        this.autoAccElement = document.getElementById("auto-acc");
         this.invertAccXElement = document.getElementById("invert-x");
         this.invertAccYElement = document.getElementById("invert-y");
         this.invertAccZElement = document.getElementById("invert-z");
-        this.manualAccXElement = document.getElementById("acc-x");
-        this.manualAccYElement = document.getElementById("acc-y");
-        this.manualAccZElement = document.getElementById("acc-z");
+        this.accXElement = document.getElementById("acc-x");
+        this.accYElement = document.getElementById("acc-y");
+        this.accZElement = document.getElementById("acc-z");
 
         this.worker = new Worker("worker.js");
         this.worker.onmessage = this.onMessage.bind(this);
@@ -19,6 +19,8 @@ class Program {
         this.sendState();
 
         this.intervalId = setInterval(this.loop.bind(this), 17);
+
+        this.lastMicReadTime = 0;
     }
 
     stop() {
@@ -29,10 +31,24 @@ class Program {
     loop() {
         this.microbit.render();
         this.sendState();
-    }
 
-    log(text) {
-        this.outputElement.value += text;
+        Accelerometer.instance.invertX = this.invertAccXElement.checked;
+        Accelerometer.instance.invertY = this.invertAccYElement.checked;
+        Accelerometer.instance.invertZ = this.invertAccZElement.checked;
+
+        if (!this.autoAccElement.checked) {
+            Accelerometer.instance.setManual(
+                this.accXElement.value,
+                this.accYElement.value,
+                this.accZElement.value
+            );
+        }
+        this.accXElement.value = Accelerometer.instance.x;
+        this.accYElement.value = Accelerometer.instance.y;
+        this.accZElement.value = Accelerometer.instance.z;
+        setAccelerometerLabel("x", this.accXElement.value);
+        setAccelerometerLabel("y", this.accYElement.value);
+        setAccelerometerLabel("z", this.accZElement.value);
     }
 
     onMessage(e) {
@@ -45,25 +61,33 @@ class Program {
                 });
                 break;
             case "out":
+                console.log(e.data.message);
+                break;
             case "error":
-                this.log(e.data.message);
+                console.log(e.data.message);
+                this.microbit.showErrorImage();
+                this.microbit.render();
+                break;
+            case "done":
+                startstop();
                 break;
             case "call":
                 this.microbit[e.data.func](...e.data.args);
+                break;
+            case "mic_read":
+                this.lastMicReadTime = Date.now();
+                this.microbit.setMicrophoneLed(true);
+                setTimeout(() => {
+                    if (Date.now() - this.lastMicReadTime >= 1000) {
+                        this.microbit.setMicrophoneLed(false);
+                    }
+                }, 1000);
                 break;
         }
     }
 
     sendState() {
         let state = this.microbit.getState();
-        if (this.manualAccElement.checked) {
-            state.acc_x = this.manualAccXElement.value;
-            state.acc_y = this.manualAccYElement.value;
-            state.acc_z = this.manualAccZElement.value;
-        }
-        if (this.invertAccXElement.checked) state.acc_x *= -1;
-        if (this.invertAccYElement.checked) state.acc_y *= -1;
-        if (this.invertAccZElement.checked) state.acc_z *= -1;
         let json = JSON.stringify(state);
         
         Atomics.store(this.sab, 0, 0);
@@ -74,9 +98,20 @@ class Program {
     }
 }
     
-function setAccelerometer(axis, value) {
+function setAccelerometerLabel(axis, value) {
     let text = "Accelerometer " + axis.toUpperCase() + " (" + value + ")";
     document.getElementById("acc-label-" + axis).textContent = text;
+}
+
+function calibrateAccelerometer() {
+    alert("Hold your device for in a way that you expect to get negative values on all axes then press OK.");
+    setTimeout(() => {
+        Accelerometer.instance.calibrate();
+        document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
+        document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
+        document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;
+        alert("Calibration complete.");
+    }, 500);
 }
 
 function isMobile() {
@@ -86,6 +121,31 @@ function isMobile() {
         || navigator.userAgent.match(/Opera Mini/i)
         || navigator.userAgent.match(/IEMobile/i)
         || navigator.userAgent.match(/WPDesktop/i);
+}
+
+function setPreset(code) {
+    document.getElementById("code").value = code;
+}
+
+// https://stackoverflow.com/questions/6637341/use-tab-to-indent-in-textarea
+function enableTextAreaTabs() {
+    let textareas = document.getElementsByTagName("textarea");
+    let count = textareas.length;
+    for(let i = 0; i < count; i++){
+        textareas[i].onkeydown = function(e) {
+            if(e.key == "Tab" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+                e.preventDefault();
+                var s = this.selectionStart;
+                this.value = this.value.substring(0,this.selectionStart) + "\t" + this.value.substring(this.selectionEnd);
+                this.selectionEnd = s+1; 
+            }
+        }
+    }
+}
+
+function showDiff() {
+    document.getElementById("diff").hidden = false;
+    document.getElementById("show-diff").remove();
 }
 
 let prog = null;
@@ -102,16 +162,24 @@ function startstop() {
 }
 
 window.onload = function() {
-    console.log = (function (old_function, div_log) { 
-        return function (text) {
-            old_function(text);
-            div_log.value += text;
-        };
-    } (console.log.bind(console), document.getElementById("out")));
+    let oldLog = console.log;
+    let divLog = document.getElementById("out");
+    console.log = text => {
+        oldLog(text);
+        let autoScroll = divLog.scrollTop + divLog.clientHeight === divLog.scrollHeight;
+        divLog.value += text;
+        if (autoScroll) {
+            divLog.scrollTop = divLog.scrollHeight;
+        }
+    };
 
-    document.getElementById("code").value = defaultCode;
+    enableTextAreaTabs();
+
     document.getElementById("out").value = "";
-    document.getElementById("manual-acc").checked = !isMobile();
+    document.getElementById("auto-acc").checked = isMobile();
+    if (!document.getElementById("code").value) {
+        setPreset(battleshipsCode);
+    }
 
     if (!crossOriginIsolated) {
         document.getElementById("startstop").disabled = true;

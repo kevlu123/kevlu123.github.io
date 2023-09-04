@@ -1,4 +1,7 @@
 {
     "liveSassCompile.settings.generateMap": false,
-    "git.enableSmartCommit": false
+    "git.enableSmartCommit": false,
+    "files.associations": {
+        "string_view": "cpp"
+    }
 }
