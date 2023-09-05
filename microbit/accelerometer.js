@@ -38,7 +38,7 @@ class Accelerometer {
         this.rawZ = rawZ;
         if (!this.manual) {
             if (this.axisMap.invertX) rawX *= -1;
-            if (this.axisMap.invertY) rawY *= -1;
+            if (!this.axisMap.invertY) rawY *= -1; // Y is inverted by default?
             if (this.axisMap.invertZ) rawZ *= -1;
             this[this.axisMap.x] = rawX;
             this[this.axisMap.y] = rawY;

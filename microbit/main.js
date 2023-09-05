@@ -77,7 +77,6 @@ class Program {
 
     stop() {
         this.worker.terminate();
-        clearInterval(this.intervalId);
     }
 
     isRunning() {
@@ -226,9 +225,9 @@ class Program {
                     }
 
                     Accelerometer.instance.axisMap = newConfig;
-                    document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
-                    document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
-                    document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;
+                    document.getElementById("invert-x").checked = newConfig.invertX;
+                    document.getElementById("invert-y").checked = newConfig.invertY;
+                    document.getElementById("invert-z").checked = newConfig.invertZ;
                     alert("Calibration complete.");
                 }, 500);
             }, 500);
