@@ -694,13 +694,13 @@
     </svg>
 
     <div id="no-coi" hidden>Cross-origin isolation is required! Try another browser.</div>
-    <button id="startstop" onclick="startstop()">Run</button>
+    <button id="startstop" onclick="program.startstop()">Run</button>
 
     <div class="acc-controls">
       <div>
-        <input id="auto-acc" type="checkbox" checked>
+        <input id="auto-acc" type="checkbox" checked onclick="program.onAutoAccelerationClicked(this.checked)">
         <span>Use device accelerometer | </span>
-        <button class="inl-btn" id="calibrate" onclick="calibrateAccelerometer()">Calibrate Axes</button>
+        <button class="inl-btn" id="calibrate" onclick="program.calibrateAccelerometer()">Calibrate Axes</button>
       </div>
 
       <div>
@@ -708,35 +708,35 @@
         <input id="invert-x" type="checkbox">
         <span>Invert Axis</span>
       </div>
-      <input id="acc-x" oninput="setAccelerometerLabel('x', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
+      <input id="acc-x" oninput="program.setAccelerometerLabel('x', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
       
       <div>
         <span id="acc-label-y">Accelerometer Y (0)</span>
         <input id="invert-y" type="checkbox">
         <span>Invert Axis</span>
       </div>
-      <input id="acc-y" oninput="setAccelerometerLabel('y', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
+      <input id="acc-y" oninput="program.setAccelerometerLabel('y', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
       
       <div>
         <span id="acc-label-z">Accelerometer Z (0)</span>
         <input id="invert-z" type="checkbox">
         <span>Invert Axis</span>
       </div>
-      <input id="acc-z" oninput="setAccelerometerLabel('z', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
+      <input id="acc-z" oninput="program.setAccelerometerLabel('z', this.value)" type="range" min="-1000" max="1000" value="0" autocomplete="off">
     </div>
 
     <span>
       <span>Output</span>
-      <button class="inl-btn" onclick="document.getElementById('out').value = ''">Clear</button>
+      <button class="inl-btn" onclick="program.clearOutput()">Clear</button>
     </span>
     <textarea id="out" spellcheck="false" readonly></textarea>
 
     <span>
       <span>Code | Presets: </span>
-      <button class="inl-btn" class="preset" onclick="setPreset(battleshipsCode)">Battleships</button>
-      <button class="inl-btn" class="preset" onclick="setPreset(patternCode)">Pattern</button>
-      <button class="inl-btn" class="preset" onclick="setPreset(micCode)">Microphone</button>
-      <button class="inl-btn" class="preset" onclick="setPreset(accCode)">Accelerometer</button>
+      <button class="inl-btn" class="preset" onclick="program.setPreset(battleshipsCode)">Battleships</button>
+      <button class="inl-btn" class="preset" onclick="program.setPreset(patternCode)">Pattern</button>
+      <button class="inl-btn" class="preset" onclick="program.setPreset(micCode)">Microphone</button>
+      <button class="inl-btn" class="preset" onclick="program.setPreset(accCode)">Accelerometer</button>
     </span>
     <textarea id="code" spellcheck="false"></textarea>
 
@@ -772,7 +772,7 @@
     <p>
       All of these incompatibilities are planned to be fixed in the future.
     </p>
-    <button id="show-diff" onclick="showDiff()">Show Diff</button>
+    <button id="show-diff" onclick="program.showDiff()">Show Diff</button>
     <div id="diff" hidden>
 
       <p><em>diff --git a/old.py b/new.py</em></p>

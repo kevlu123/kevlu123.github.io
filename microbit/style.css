@@ -42,6 +42,10 @@ button {
   cursor: pointer;
 }
 
+button[disabled] {
+  cursor: default;
+}
+
 h2 {
   font-family: monospace;
   font-size: x-large;

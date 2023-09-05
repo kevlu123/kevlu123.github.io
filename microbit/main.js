@@ -1,8 +1,7 @@
 class Program {
     constructor() {
-        let svg = document.getElementById("microbit");
-        this.microbit = new Microbit(svg);
-
+        // Get html elements
+        this.outputElement = document.getElementById("out");
         this.codeElement = document.getElementById("code");
         this.autoAccElement = document.getElementById("auto-acc");
         this.invertAccXElement = document.getElementById("invert-x");
@@ -11,16 +10,69 @@ class Program {
         this.accXElement = document.getElementById("acc-x");
         this.accYElement = document.getElementById("acc-y");
         this.accZElement = document.getElementById("acc-z");
+        this.startstopElement = document.getElementById("startstop");
+        this.calibrateElement = document.getElementById("calibrate");
 
+        // Override console.log to also print to the output textarea
+        let oldLog = console.log;
+        let divLog = this.outputElement;
+        divLog.value = "";
+        console.log = text => {
+            oldLog(text);
+            let autoScroll = Math.abs(divLog.scrollTop + divLog.clientHeight - divLog.scrollHeight) < 10;
+            divLog.value += text;
+            if (autoScroll) {
+                divLog.scrollTop = divLog.scrollHeight;
+            }
+        };
+        this.enableTextAreaTabs();
+
+        // Show default code
+        if (!this.codeElement.value) {
+            this.setPreset(battleshipsCode);
+        }
+        
+        // Enable device accelerometer if on mobile
+        this.autoAccElement.checked = this.isMobile();
+        this.onAutoAccelerationClicked(this.autoAccElement.checked);
+
+        // Show error if cross-origin isolation is not enabled
+        if (!crossOriginIsolated) {
+            this.startstopElement.disabled = true;
+            this.startstopElement.style.textDecoration = "line-through";
+            document.getElementById("no-coi").hidden = false;
+        }
+        
+        // Initialize microbit
+        let svg = document.getElementById("microbit");
+        this.microbit = new Microbit(svg);
+        this.lastMicReadTime = 0;
+
+        // Initialize web worker properties
+        this.worker = null;
+        this.sab_buffer = null;
+        this.sab = null;
+
+        // Start main loop
+        this.intervalId = setInterval(this.loop.bind(this), 20);
+    }
+
+    startstop() {
+        if (this.isRunning()) {
+            this.stop();
+            this.startstopElement.innerHTML = "Run";
+        } else {
+            this.startstopElement.innerHTML = "Stop";
+            this.start();
+        }
+    }
+
+    start() {
         this.worker = new Worker("worker.js");
         this.worker.onmessage = this.onMessage.bind(this);
         this.sab_buffer = new SharedArrayBuffer(1024);
         this.sab = new Int32Array(this.sab_buffer);
         this.sendState();
-
-        this.intervalId = setInterval(this.loop.bind(this), 20);
-
-        this.lastMicReadTime = 0;
     }
 
     stop() {
@@ -28,14 +80,20 @@ class Program {
         clearInterval(this.intervalId);
     }
 
+    isRunning() {
+        return this.worker !== null;
+    }
+
     loop() {
-        this.microbit.render();
-        this.sendState();
+        if (this.isRunning()) {
+            this.microbit.render();
+            this.sendState();
+        }
 
-        Accelerometer.instance.invertX = this.invertAccXElement.checked;
-        Accelerometer.instance.invertY = this.invertAccYElement.checked;
-        Accelerometer.instance.invertZ = this.invertAccZElement.checked;
-
+        Accelerometer.instance.axisMap.invertX = this.invertAccXElement.checked;
+        Accelerometer.instance.axisMap.invertY = this.invertAccYElement.checked;
+        Accelerometer.instance.axisMap.invertZ = this.invertAccZElement.checked;
+        Accelerometer.instance.manual = !this.autoAccElement.checked;
         if (!this.autoAccElement.checked) {
             Accelerometer.instance.setManual(
                 this.accXElement.value,
@@ -46,9 +104,9 @@ class Program {
         this.accXElement.value = Accelerometer.instance.x;
         this.accYElement.value = Accelerometer.instance.y;
         this.accZElement.value = Accelerometer.instance.z;
-        setAccelerometerLabel("x", this.accXElement.value);
-        setAccelerometerLabel("y", this.accYElement.value);
-        setAccelerometerLabel("z", this.accZElement.value);
+        this.setAccelerometerLabel("x", this.accXElement.value);
+        this.setAccelerometerLabel("y", this.accYElement.value);
+        this.setAccelerometerLabel("z", this.accZElement.value);
     }
 
     onMessage(e) {
@@ -96,131 +154,89 @@ class Program {
         Atomics.store(this.sab, 0, 1);
         Atomics.notify(this.sab, 0);
     }
-}
+
+    onAutoAccelerationClicked(checked) {
+        this.calibrateElement.disabled = !checked;
+        this.invertAccXElement.disabled = !checked;
+        this.invertAccYElement.disabled = !checked;
+        this.invertAccZElement.disabled = !checked;
+        this.accXElement.disabled = checked;
+        this.accYElement.disabled = checked;
+        this.accZElement.disabled = checked;
+    }
     
-function setAccelerometerLabel(axis, value) {
-    let text = "Accelerometer " + axis.toUpperCase() + " (" + value + ")";
-    document.getElementById("acc-label-" + axis).textContent = text;
-}
+    isMobile() {
+        return navigator.userAgent.match(/Android/i)
+            || navigator.userAgent.match(/BlackBerry/i)
+            || navigator.userAgent.match(/iPhone|iPad|iPod/i)
+            || navigator.userAgent.match(/Opera Mini/i)
+            || navigator.userAgent.match(/IEMobile/i)
+            || navigator.userAgent.match(/WPDesktop/i);
+    }
 
-function calibrateAccelerometer() {
-    let originalConfig = {
-        axisMap: Object.assign({}, Accelerometer.instance.axisMap),
-        invertX: Accelerometer.instance.invertX,
-        invertY: Accelerometer.instance.invertY,
-        invertZ: Accelerometer.instance.invertZ,
-    };
+    clearOutput() {
+        this.outputElement.value = "";
+    }
 
-    alert("Hold your device so that the bottom of the screen points toward the ground, then press OK.");
-    setTimeout(() => {
-        Accelerometer.instance.calibrateAxis("Y");
-        alert("Hold your device so that the left side of the screen points toward the ground, then press OK.");
-        setTimeout(() => {
-            Accelerometer.instance.calibrateAxis("X");
-            alert("Lay your device flat with the screen facing towards the sky, then press OK.");
-            setTimeout(() => {
-                Accelerometer.instance.calibrateAxis("Z");
+    setPreset(code) {
+        this.codeElement.value = code;
+    }
 
-                if (Accelerometer.instance.axisMap["x"] === Accelerometer.instance.axisMap["y"]
-                    || Accelerometer.instance.axisMap["x"] === Accelerometer.instance.axisMap["z"]
-                    || Accelerometer.instance.axisMap["y"] === Accelerometer.instance.axisMap["z"])
-                {
-                    alert("Calibration failed. Please try again.");
-                    Accelerometer.instance.axisMap = originalConfig.axisMap;
-                    Accelerometer.instance.invertX = originalConfig.invertX;
-                    Accelerometer.instance.invertY = originalConfig.invertY;
-                    Accelerometer.instance.invertZ = originalConfig.invertZ;
-                    return;
-                }
-
-                document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
-                document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
-                document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;
-                alert("Calibration complete.");
-            }, 500);
-        }, 500);
-    }, 500);
-    //alert("Hold your device so that the bottom left points toward the ground"
-    //    + " while the screen is tilted slightly towards the sky, then press OK.");
-    //setTimeout(() => {
-    //    Accelerometer.instance.calibrate();
-    //    document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
-    //    document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
-    //    document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;
-    //    alert("Calibration complete.");
-    //}, 500);
-}
-
-function isMobile() {
-    return navigator.userAgent.match(/Android/i)
-        || navigator.userAgent.match(/BlackBerry/i)
-        || navigator.userAgent.match(/iPhone|iPad|iPod/i)
-        || navigator.userAgent.match(/Opera Mini/i)
-        || navigator.userAgent.match(/IEMobile/i)
-        || navigator.userAgent.match(/WPDesktop/i);
-}
-
-function setPreset(code) {
-    document.getElementById("code").value = code;
-}
-
-// https://stackoverflow.com/questions/6637341/use-tab-to-indent-in-textarea
-function enableTextAreaTabs() {
-    let textareas = document.getElementsByTagName("textarea");
-    let count = textareas.length;
-    for(let i = 0; i < count; i++){
-        textareas[i].onkeydown = function(e) {
+    // https://stackoverflow.com/questions/6637341/use-tab-to-indent-in-textarea
+    enableTextAreaTabs() {
+        this.outputElement.onkeydown = function(e) {
             if(e.key == "Tab" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
                 e.preventDefault();
-                var s = this.selectionStart;
+                let s = this.selectionStart;
                 this.value = this.value.substring(0,this.selectionStart) + "\t" + this.value.substring(this.selectionEnd);
-                this.selectionEnd = s+1; 
+                this.selectionEnd = s + 1; 
             }
         }
     }
-}
+    
+    showDiff() {
+        document.getElementById("diff").hidden = false;
+        document.getElementById("show-diff").remove();
+    }
+    
+    setAccelerometerLabel(axis, value) {
+        let text = "Accelerometer " + axis.toUpperCase() + " (" + value + ")";
+        document.getElementById("acc-label-" + axis).textContent = text;
+    }
 
-function showDiff() {
-    document.getElementById("diff").hidden = false;
-    document.getElementById("show-diff").remove();
-}
+    calibrateAccelerometer() {
+        let newConfig = {};
+        alert("Hold your device so that the bottom of the screen points toward the ground, then press OK.");
+        setTimeout(() => {
+            [newConfig.y, newConfig.invertY] = Accelerometer.instance.getExtremeAxis();
+            alert("Hold your device so that the left side of the screen points toward the ground, then press OK.");
+            setTimeout(() => {
+                [newConfig.x, newConfig.invertX] = Accelerometer.instance.getExtremeAxis();
+                alert("Lay your device flat with the screen facing towards the sky, then press OK.");
+                setTimeout(() => {
+                    [newConfig.z, newConfig.invertZ] = Accelerometer.instance.getExtremeAxis();
 
-let prog = null;
-function startstop() {
-    let btn = document.getElementById("startstop");
-    if (prog) {
-        prog.stop();
-        btn.innerHTML = "Run";
-        prog = null;
-    } else {
-        btn.innerHTML = "Stop";
-        prog = new Program();
+                    alert(JSON.stringify(newConfig));
+                    if (newConfig.x === newConfig.y
+                        || newConfig.x === newConfig.z
+                        || newConfig.y === newConfig.z)
+                    {
+                        alert("Calibration failed. Please try again.");
+                        return;
+                    }
+
+                    Accelerometer.instance.axisMap = newConfig;
+                    document.getElementById("invert-x").checked = Accelerometer.instance.invertX;
+                    document.getElementById("invert-y").checked = Accelerometer.instance.invertY;
+                    document.getElementById("invert-z").checked = Accelerometer.instance.invertZ;
+                    alert("Calibration complete.");
+                }, 500);
+            }, 500);
+        }, 500);
     }
 }
 
+let program = null;
 window.onload = function() {
-    let oldLog = console.log;
-    let divLog = document.getElementById("out");
-    console.log = text => {
-        oldLog(text);
-        let autoScroll = divLog.scrollTop + divLog.clientHeight === divLog.scrollHeight;
-        divLog.value += text;
-        if (autoScroll) {
-            divLog.scrollTop = divLog.scrollHeight;
-        }
-    };
-
-    enableTextAreaTabs();
-
-    document.getElementById("out").value = "";
-    document.getElementById("auto-acc").checked = isMobile();
-    if (!document.getElementById("code").value) {
-        setPreset(battleshipsCode);
-    }
-
-    if (!crossOriginIsolated) {
-        document.getElementById("startstop").disabled = true;
-        document.getElementById("startstop").style.textDecoration = "line-through";
-        document.getElementById("no-coi").hidden = false;
-    }
+    program = new Program();
 };

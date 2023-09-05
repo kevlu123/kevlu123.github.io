@@ -1,8 +1,13 @@
 class Accelerometer {
     constructor() {
-        // Request permission for iOS 13+ devices
-        if (DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function") {
-            DeviceMotionEvent.requestPermission();
+        if (typeof DeviceMotionEvent === "undefined") {
+            console.log("DeviceMotionEvent is not supported. Device accelerometer will not work.");
+        } else {
+            ondevicemotion = this._onMotion.bind(this);
+            // Request permission for iOS 13+ devices
+            if (typeof DeviceMotionEvent.requestPermission === "function") {
+                DeviceMotionEvent.requestPermission();
+            }
         }
         
         this.x = 0;
@@ -11,32 +16,33 @@ class Accelerometer {
         this.rawX = 0;
         this.rawY = 0;
         this.rawZ = 0;
-        this.invertX = false;
-        this.invertY = false;
-        this.invertZ = false;
 
         this.manual = false;
 
         this.axisMap = {
-            "x": "x",
-            "x": "y",
-            "z": "z",
+            x: "x",
+            y: "y",
+            z: "z",
+            invertX: false,
+            invertY: false,
+            invertZ: false,
         };
-
-        ondevicemotion = this._onMotion.bind(this);
     }
     
     _onMotion(event) {
-        this.rawX = ms2ToMilliG(event.accelerationIncludingGravity.x);
-        this.rawY = ms2ToMilliG(event.accelerationIncludingGravity.y);
-        this.rawZ = ms2ToMilliG(event.accelerationIncludingGravity.z);
+        let rawX = ms2ToMilliG(event.accelerationIncludingGravity.x);
+        let rawY = ms2ToMilliG(event.accelerationIncludingGravity.y);
+        let rawZ = ms2ToMilliG(event.accelerationIncludingGravity.z);
+        this.rawX = rawX;
+        this.rawY = rawY;
+        this.rawZ = rawZ;
         if (!this.manual) {
-            this[this.axisMap["x"]] = this.rawX;
-            this[this.axisMap["y"]] = this.rawY;
-            this[this.axisMap["z"]] = this.rawZ;
-            if (this.invertX) this.x *= -1;
-            if (this.invertY) this.y *= -1;
-            if (this.invertZ) this.z *= -1;
+            if (this.axisMap.invertX) rawX *= -1;
+            if (this.axisMap.invertY) rawY *= -1;
+            if (this.axisMap.invertZ) rawZ *= -1;
+            this[this.axisMap.x] = rawX;
+            this[this.axisMap.y] = rawY;
+            this[this.axisMap.z] = rawZ;
         }
     }
 
@@ -49,31 +55,32 @@ class Accelerometer {
         this.z = z;
     }
 
-    //calibrate() {
-    //    this.invertX = this.rawX > 0;
-    //    this.invertY = this.rawY < 0;
-    //    this.invertZ = this.rawZ > 0;
-    //}
-
-    calibrateAxis(axis) {
+    // Gets the most extreme axis and whether it is inverted
+    getExtremeAxis() {
         // axis is upper case
-        let extreme = Math.min(
+        let extreme = Math.max(
             Math.abs(this.rawX),
             Math.abs(this.rawY),
             Math.abs(this.rawZ)
         );
         for (let ax of ["X", "Y", "Z"]) {
             if (Math.abs(this["raw" + ax]) === extreme) {
-                this.axisMap[axis.toLowerCase()] = ax.toLowerCase();
-                this["invert" + ax] = this["raw" + ax] > 0;
-                return;
+                return [
+                    ax.toLowerCase(),
+                    this["raw" + ax] > 0
+                ];
             }
         }
     }
 }
 
-Accelerometer.instance = new Accelerometer();
-
+setTimeout(() => {
+try {
+    Accelerometer.instance = new Accelerometer();
+} catch (e) {
+    console.log(e.stack);
+}
+}, 500);
 function ms2ToMilliG(ms2) {
     return ms2 / 9.81 * 1000;
 }
