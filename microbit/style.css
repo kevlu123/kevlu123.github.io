@@ -84,7 +84,7 @@ h2 {
   padding: 10px;
 }
 
-.acc-controls {
+.controls {
   display: flex;
   justify-content: center;
   flex-direction: column;

@@ -700,7 +700,7 @@
     <div id="no-coi" hidden>Cross-origin isolation is required! Try another browser.</div>
     <button id="startstop" onclick="program.startstop()">Run</button>
 
-    <div class="acc-controls">
+    <div class="controls">
       <div>
         <input id="auto-acc" type="checkbox" checked onclick="program.onAutoAccelerationClicked(this.checked)">
         <span>Use device accelerometer | </span>
@@ -727,6 +727,11 @@
         <span>Invert Axis</span>
       </div>
       <input id="acc-z" oninput="program.setAccelerometerLabel('z', this.value)" type="range" min="-2000" max="2000" value="0" autocomplete="off">
+    </div>
+
+    <div class="controls">
+      <span id="mic-sensitivity-label">Microphone Sensitivity (1)</span>
+      <input id="mic-sensitivity" type="range" oninput="program.setMicSensitivityLavel(this.value)" step="0.01" min="0" max="4" value="1" autocomplete="off">
     </div>
 
     <span>

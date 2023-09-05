@@ -12,6 +12,8 @@ class Program {
         this.accZElement = document.getElementById("acc-z");
         this.startstopElement = document.getElementById("startstop");
         this.calibrateElement = document.getElementById("calibrate");
+        this.micSensitivityElement = document.getElementById("mic-sensitivity");
+        this.micSensitivityLabelElement = document.getElementById("mic-sensitivity-label");
         this.microbitSvg = document.getElementById("microbit");
 
         // Override console.log to also print to the output textarea
@@ -147,6 +149,7 @@ class Program {
 
     sendState() {
         let state = this.microbit.getState();
+        state.mic_vol = Math.max(0, Math.min(255, state.mic_vol * this.micSensitivityElement.value));
         let json = JSON.stringify(state);
         
         Atomics.store(this.sab, 0, 0);
@@ -198,6 +201,10 @@ class Program {
     showDiff() {
         document.getElementById("diff").hidden = false;
         document.getElementById("show-diff").remove();
+    }
+
+    setMicSensitivityLavel(value) {
+        this.micSensitivityLabelElement.textContent = "Microphone sensitivity (" + value + ")";
     }
     
     setAccelerometerLabel(axis, value) {

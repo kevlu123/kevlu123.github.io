@@ -1,6 +1,5 @@
 class Microphone {
     constructor() {
-        this.volumeCallback = null;
         this.initializeMicrophone();
         this.volume = 0;
     }
@@ -36,7 +35,7 @@ class Microphone {
             };
             setInterval(volumeCallback, 100);
         } catch (e) {
-            console.error('Failed to initialize volume visualizer, simulating instead...\n', e);
+            console.log("Failed to initialize microphone.");
             // Simulation
             //TODO remove in production!
             //let lastVolume = 50;
