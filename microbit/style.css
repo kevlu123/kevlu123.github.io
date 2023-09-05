@@ -9,6 +9,14 @@ body {
   background-color: bisque;
 }
 
+svg * {
+  /* Disable selection in mobile */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
 p, span, textarea, label {
   font-family: monospace;
 }

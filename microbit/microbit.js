@@ -83,9 +83,9 @@ class Button {
         this._mouseDown = false;
         this._presses = 0;
         this._pressCount = 0;
-        this._element.setAttribute("role", "button");
-        this._element.setAttribute("tabindex", "0");
-        this._element.style.cursor = "pointer";
+        //this._element.setAttribute("role", "button");
+        //this._element.setAttribute("tabindex", "0");
+        //this._element.style.cursor = "pointer";
         this.keyListener = (e) => {
             switch (e.key) {
                 case "Enter":
