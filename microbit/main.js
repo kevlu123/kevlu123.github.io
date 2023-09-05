@@ -12,6 +12,7 @@ class Program {
         this.accZElement = document.getElementById("acc-z");
         this.startstopElement = document.getElementById("startstop");
         this.calibrateElement = document.getElementById("calibrate");
+        this.microbitSvg = document.getElementById("microbit");
 
         // Override console.log to also print to the output textarea
         let oldLog = console.log;
@@ -44,8 +45,7 @@ class Program {
         }
         
         // Initialize microbit
-        let svg = document.getElementById("microbit");
-        this.microbit = new Microbit(svg);
+        this.microbit = new Microbit(this.microbitSvg);
         this.lastMicReadTime = 0;
 
         // Initialize web worker properties
@@ -60,14 +60,14 @@ class Program {
     startstop() {
         if (this.isRunning()) {
             this.stop();
-            this.startstopElement.innerHTML = "Run";
         } else {
-            this.startstopElement.innerHTML = "Stop";
             this.start();
         }
     }
 
     start() {
+        this.startstopElement.innerHTML = "Stop";
+        this.microbit = new Microbit(this.microbitSvg);
         this.worker = new Worker("worker.js");
         this.worker.onmessage = this.onMessage.bind(this);
         this.sab_buffer = new SharedArrayBuffer(1024);
@@ -77,6 +77,8 @@ class Program {
 
     stop() {
         this.worker.terminate();
+        this.worker = null;
+        this.startstopElement.innerHTML = "Run";
     }
 
     isRunning() {
@@ -215,7 +217,6 @@ class Program {
                 setTimeout(() => {
                     [newConfig.z, newConfig.invertZ] = Accelerometer.instance.getExtremeAxis();
 
-                    alert(JSON.stringify(newConfig));
                     if (newConfig.x === newConfig.y
                         || newConfig.x === newConfig.z
                         || newConfig.y === newConfig.z)

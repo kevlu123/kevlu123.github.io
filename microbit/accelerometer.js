@@ -30,9 +30,9 @@ class Accelerometer {
     }
     
     _onMotion(event) {
-        let rawX = ms2ToMilliG(event.accelerationIncludingGravity.x);
-        let rawY = ms2ToMilliG(event.accelerationIncludingGravity.y);
-        let rawZ = ms2ToMilliG(event.accelerationIncludingGravity.z);
+        let rawX = ms2ToMilliG(-event.accelerationIncludingGravity.x);
+        let rawY = ms2ToMilliG(-event.accelerationIncludingGravity.y);
+        let rawZ = ms2ToMilliG(-event.accelerationIncludingGravity.z);
         this.rawX = rawX;
         this.rawY = rawY;
         this.rawZ = rawZ;
@@ -74,13 +74,8 @@ class Accelerometer {
     }
 }
 
-setTimeout(() => {
-try {
-    Accelerometer.instance = new Accelerometer();
-} catch (e) {
-    console.log(e.stack);
-}
-}, 500);
+Accelerometer.instance = new Accelerometer();
+
 function ms2ToMilliG(ms2) {
     return ms2 / 9.81 * 1000;
 }
