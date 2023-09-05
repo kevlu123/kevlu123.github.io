@@ -18,7 +18,7 @@ waveform = [0, 0, 0, 0, 0]
 while True:
 	print(microphone.sound_level())
 	sample = int(microphone.sound_level() / 255 * 5)
-	sample = max(0, min(4, sample))
+	sample = max(0, min(5, sample))
 	waveform.pop()
 	waveform.insert(0, sample)
 
